@@ -56,7 +56,29 @@ ZONE_WILD = (-58, -33, 2, 31)          # hostile mob roam/spawn area (superset o
 ZONE_PASTURE = (-30, -6, 34, 58)
 ZONE_PVP_ARENA = (10, 34,10, 34)
 
-RESPAWN_POINT = {"x": 0.0, "y": 11.0, "z": 0.0}
+RESPAWN_POINT = {"x": 0.0, "y": 11.0, "z": 0.0}  # fallback only, e.g. for an unrecognized player_number
+
+# Each player's "home" respawn point: their own parcel's entrance, facing the plaza.
+# MUST mirror PARCEL_SPAWN_POINTS in js/game.js exactly.
+PARCEL_SPAWN_POINTS = {
+    1: (-53, -60), 2: (-38, -60), 3: (-23, -60), 4: (-8, -60),
+    5: (7, -60), 6: (22, -60), 7: (37, -60), 8: (52, -60),
+    9: (59, -53), 10: (59, -38), 11: (59, -23), 12: (59, -8),
+    13: (59, 7), 14: (59, 22), 15: (59, 37), 16: (59, 52),
+    17: (52, 59), 18: (37, 59), 19: (22, 59), 20: (7, 59),
+    21: (-8, 59), 22: (-23, 59), 23: (-38, 59), 24: (-53, 59),
+    25: (-60, 52), 26: (-60, 37), 27: (-60, 22), 28: (-60, 7),
+    29: (-60, -8), 30: (-60, -23), 31: (-60, -38), 32: (-60, -53),
+}
+
+
+def get_parcel_spawn_point(player_num):
+    coords = PARCEL_SPAWN_POINTS.get(player_num)
+    if coords is None:
+        return dict(RESPAWN_POINT)
+    return {"x": coords[0] + 0.5, "y": 10.0, "z": coords[1] + 0.5}
+
+
 SAPLING_GROW_SECONDS = 60
 ORE_RESPAWN_SECONDS = 75
 
@@ -452,7 +474,7 @@ async def handle_player_death(room, session_info):
     session_info["hp"] = session_info.get("maxHp", 20)
     await send_to_id(room, session_info["id"], {
         "type": "player_died",
-        "respawn": RESPAWN_POINT,
+        "respawn": get_parcel_spawn_point(session_info.get("player_number")),
         "hp": session_info["hp"]
     })
     await broadcast_room(room, {
@@ -769,19 +791,6 @@ async def websocket_handler(request):
                             "msg": "방장님이 이전 지도를 불러왔습니다!"
                         })
 
-                elif msg_type == "save_map" and current_room_key and session_info:
-                    room = rooms.get(current_room_key)
-                    if room:
-                        room["last_active"] = time.time()
-                        save_rooms_data()
-                        print(f"[MAP] Map saved by '{session_info['display_name']}' for room '{room['room_id']}'")
-
-                        await broadcast_room(room, {
-                            "type": "map_saved_notify",
-                            "by": session_info["display_name"],
-                            "msg": f"지도가 성공적으로 저장되었습니다! (저장한 유저: {session_info['display_name']})"
-                        })
-
                 elif msg_type == "player_state" and current_room_key and session_info:
                     room = rooms.get(current_room_key)
                     if not room:
@@ -907,13 +916,19 @@ async def websocket_handler(request):
                     mob["hp"] -= dmg
                     if mob["hp"] <= 0:
                         loot = LOOT_TABLE.get(mob["type"], {})
-                        pnum = str(session_info["player_number"])
-                        inv = room["player_inventories"].setdefault(pnum, default_inventory())
-                        for item, qty in loot.items():
-                            inv["resources"][item] = inv["resources"].get(item, 0) + qty
+                        if loot:
+                            # Also fold the loot into the server's own copy for persistence (so
+                            # it survives even if the client never reconnects again), but hand
+                            # the CLIENT only the delta - not the full inventory - so a slightly
+                            # stale server-side snapshot can never clobber resources the player
+                            # already gathered locally moments ago and hasn't round-tripped yet.
+                            pnum = str(session_info["player_number"])
+                            inv = room["player_inventories"].setdefault(pnum, default_inventory())
+                            for item, qty in loot.items():
+                                inv["resources"][item] = inv["resources"].get(item, 0) + qty
+                            save_rooms_data()
+                            await ws.send_str(json.dumps({"type": "loot_granted", "loot": loot}))
                         del room["mobs"][target_id]
-                        save_rooms_data()
-                        await ws.send_str(json.dumps({"type": "inventory_sync", "inventory": inv}))
                         await broadcast_room(room, {"type": "entity_removed", "ids": [target_id], "reason": "killed"})
                     else:
                         await broadcast_room(room, {"type": "entity_update", "mobs": [mob]})

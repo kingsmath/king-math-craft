@@ -25,16 +25,36 @@ function inZone(x, z, zone) {
     return x >= zone[0] && x <= zone[1] && z >= zone[2] && z <= zone[3];
 }
 
+// Each player's "home" point: right at their own parcel's entrance, facing the plaza.
+// Used both as the death-respawn point (server sends the matching table for player_number,
+// see server.py PARCEL_SPAWN_POINTS) and as the local fall-through-world recovery point.
+const PARCEL_SPAWN_POINTS = {
+    1: { x: -53, z: -60 }, 2: { x: -38, z: -60 }, 3: { x: -23, z: -60 }, 4: { x: -8, z: -60 },
+    5: { x: 7, z: -60 }, 6: { x: 22, z: -60 }, 7: { x: 37, z: -60 }, 8: { x: 52, z: -60 },
+    9: { x: 59, z: -53 }, 10: { x: 59, z: -38 }, 11: { x: 59, z: -23 }, 12: { x: 59, z: -8 },
+    13: { x: 59, z: 7 }, 14: { x: 59, z: 22 }, 15: { x: 59, z: 37 }, 16: { x: 59, z: 52 },
+    17: { x: 52, z: 59 }, 18: { x: 37, z: 59 }, 19: { x: 22, z: 59 }, 20: { x: 7, z: 59 },
+    21: { x: -8, z: 59 }, 22: { x: -23, z: 59 }, 23: { x: -38, z: 59 }, 24: { x: -53, z: 59 },
+    25: { x: -60, z: 52 }, 26: { x: -60, z: 37 }, 27: { x: -60, z: 22 }, 28: { x: -60, z: 7 },
+    29: { x: -60, z: -8 }, 30: { x: -60, z: -23 }, 31: { x: -60, z: -38 }, 32: { x: -60, z: -53 }
+};
+
 class VoxelWorld {
     constructor(scene) {
         this.scene = scene;
         this.worldSize = 160; // 160x160 blocks (-80 to 79)
         this.blocks = new Map();
-        
+
+        // Cache of just the currently-visible (surface-exposed) blocks, kept incrementally in
+        // sync by setBlock(). rebuildAllChunks() only needs to iterate this much smaller set
+        // instead of re-scanning the whole world (100k+ blocks) on every single block change.
+        this.exposedBlocks = new Map();
+        this._bulkGenerating = false;
+
         this.chunkGroup = null;
         this.materials = [];
         this.parcelMaterials = new Map();
-        
+
         this.initTextures();
         this.generateWorld();
     }
@@ -216,12 +236,58 @@ class VoxelWorld {
         return this.blocks.get(this.getKey(x, y, z)) || 0;
     }
 
+    isBlockExposed(x, y, z) {
+        return (
+            this.getBlock(x + 1, y, z) === 0 ||
+            this.getBlock(x - 1, y, z) === 0 ||
+            this.getBlock(x, y + 1, z) === 0 ||
+            this.getBlock(x, y - 1, z) === 0 ||
+            this.getBlock(x, y, z + 1) === 0 ||
+            this.getBlock(x, y, z - 1) === 0
+        );
+    }
+
+    // Re-evaluates exposure for a block and its 6 neighbors (the only ones whose exposure
+    // could possibly have changed) instead of the whole world.
+    updateExposureAround(x, y, z) {
+        const coords = [[x, y, z], [x + 1, y, z], [x - 1, y, z], [x, y + 1, z], [x, y - 1, z], [x, y, z + 1], [x, y, z - 1]];
+        coords.forEach(([cx, cy, cz]) => {
+            const key = this.getKey(cx, cy, cz);
+            const type = this.blocks.get(key);
+            if (type === undefined) {
+                this.exposedBlocks.delete(key);
+                return;
+            }
+            if (this.isBlockExposed(cx, cy, cz)) {
+                this.exposedBlocks.set(key, type);
+            } else {
+                this.exposedBlocks.delete(key);
+            }
+        });
+    }
+
+    // One-time full scan, only used right after bulk world generation (see generateWorld()).
+    computeAllExposure() {
+        this.exposedBlocks.clear();
+        this.blocks.forEach((type, key) => {
+            const [x, y, z] = key.split(',').map(Number);
+            if (this.isBlockExposed(x, y, z)) {
+                this.exposedBlocks.set(key, type);
+            }
+        });
+    }
+
     setBlock(x, y, z, blockType, rebuild = true) {
         const key = this.getKey(x, y, z);
         if (blockType === 0) {
             this.blocks.delete(key);
         } else {
             this.blocks.set(key, blockType);
+        }
+        // Skip incremental tracking during bulk world generation - a single computeAllExposure()
+        // pass at the end is far cheaper than tens of thousands of redundant incremental updates.
+        if (!this._bulkGenerating) {
+            this.updateExposureAround(x, y, z);
         }
         if (rebuild) this.rebuildAllChunks();
     }
@@ -290,6 +356,7 @@ class VoxelWorld {
 
     // Completely Flat Surface Generation (Y = 4 Surface Only for Ultra GPU Efficiency)
     generateWorld() {
+        this._bulkGenerating = true;
         const half = 80;
         // Bedrock stays unbreakable at y=4 (BASE_UNBREAKABLE_Y, mirrored in server.py block_change
         // handler). Surface sits 5 layers above it (y=9) so players can dig down through 5 diggable
@@ -325,6 +392,9 @@ class VoxelWorld {
 
         this.buildCentralHub(groundHeight);
         this.createParcelSignposts(groundHeight);
+
+        this._bulkGenerating = false;
+        this.computeAllExposure();
         this.rebuildAllChunks();
     }
 
@@ -549,23 +619,7 @@ class VoxelWorld {
 
     createParcelSignposts(groundHeight) {
         // Signposts placed right at entrance facing the Central Living Room!
-        const signPositions = [
-            // North Side (Facing South)
-            { num: 1, x: -53, z: -60 }, { num: 2, x: -38, z: -60 }, { num: 3, x: -23, z: -60 }, { num: 4, x: -8, z: -60 },
-            { num: 5, x: 7, z: -60 },   { num: 6, x: 22, z: -60 },  { num: 7, x: 37, z: -60 },  { num: 8, x: 52, z: -60 },
-            
-            // East Side (Facing West)
-            { num: 9, x: 59, z: -53 },  { num: 10, x: 59, z: -38 }, { num: 11, x: 59, z: -23 }, { num: 12, x: 59, z: -8 },
-            { num: 13, x: 59, z: 7 },   { num: 14, x: 59, z: 22 },  { num: 15, x: 59, z: 37 },  { num: 16, x: 59, z: 52 },
-
-            // South Side (Facing North)
-            { num: 17, x: 52, z: 59 },  { num: 18, x: 37, z: 59 },  { num: 19, x: 22, z: 59 },  { num: 20, x: 7, z: 59 },
-            { num: 21, x: -8, z: 59 },  { num: 22, x: -23, z: 59 }, { num: 23, x: -38, z: 59 }, { num: 24, x: -53, z: 59 },
-
-            // West Side (Facing East)
-            { num: 25, x: -60, z: 52 }, { num: 26, x: -60, z: 37 }, { num: 27, x: -60, z: 22 }, { num: 28, x: -60, z: 7 },
-            { num: 29, x: -60, z: -8 }, { num: 30, x: -60, z: -23 },{ num: 31, x: -60, z: -38 },{ num: 32, x: -60, z: -53 }
-        ];
+        const signPositions = Object.entries(PARCEL_SPAWN_POINTS).map(([num, p]) => ({ num: parseInt(num, 10), x: p.x, z: p.z }));
 
         this.signGroup = new THREE.Group();
 
@@ -622,19 +676,10 @@ class VoxelWorld {
 
         const materialGroups = new Map();
 
-        this.blocks.forEach((type, key) => {
+        // exposedBlocks is already filtered to just the surface-visible blocks (maintained
+        // incrementally by setBlock/updateExposureAround), so no per-block neighbor checks here.
+        this.exposedBlocks.forEach((type, key) => {
             const [x, y, z] = key.split(',').map(Number);
-
-            const isExposed = (
-                this.getBlock(x + 1, y, z) === 0 ||
-                this.getBlock(x - 1, y, z) === 0 ||
-                this.getBlock(x, y + 1, z) === 0 ||
-                this.getBlock(x, y - 1, z) === 0 ||
-                this.getBlock(x, y, z + 1) === 0 ||
-                this.getBlock(x, y, z - 1) === 0
-            );
-
-            if (!isExposed) return;
 
             if (!materialGroups.has(type)) {
                 materialGroups.set(type, []);
@@ -739,6 +784,17 @@ class MinecraftGame {
         if (this.viewmodelArm && this.appearance) {
             this.viewmodelArm.material.color.set(this.appearance.skin || '#ffdbac');
         }
+    }
+
+    // Safety net: bedrock (y=4) should always block falling further down, but if anything ever
+    // lets a player slip through (lag, a movement edge case, etc.), auto-recover them back to
+    // their own parcel's entrance instead of leaving them stuck falling forever.
+    checkFallRecovery() {
+        if (this.physics.position.y >= -6) return;
+        const spawn = PARCEL_SPAWN_POINTS[this.physics.playerNumber] || { x: 0, z: 0 };
+        this.physics.position.set(spawn.x + 0.5, 10, spawn.z + 0.5);
+        this.physics.velocity.set(0, 0, 0);
+        this.showToast('⚠️ 바닥 아래로 떨어져서 내 땅 앞으로 돌아왔습니다!');
     }
 
     // Real-time room-id availability check (debounced) - min 4 characters required
@@ -1357,11 +1413,6 @@ class MinecraftGame {
             }
         });
 
-        // Save Map Button Handler
-        document.getElementById('btn-save-map').addEventListener('click', () => {
-            this.net.sendSaveMapRequest();
-        });
-
         // Fullscreen Toggle Button Handler
         const fullscreenBtn = document.getElementById('btn-fullscreen');
         if (fullscreenBtn) {
@@ -1451,6 +1502,7 @@ class MinecraftGame {
         this.lastTime = now;
 
         this.physics.update(delta);
+        this.checkFallRecovery();
 
         if (this.viewmodelArm) {
             const isWalking = this.physics.keys.forward || this.physics.keys.backward || this.physics.keys.left || this.physics.keys.right;

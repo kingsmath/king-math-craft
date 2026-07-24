@@ -233,10 +233,6 @@ class NetworkManager {
                 if (data.msg) this.game.showToast(`📜 ${data.msg}`);
                 break;
 
-            case 'map_saved_notify':
-                if (data.msg) this.game.showToast(`💾 ${data.msg}`);
-                break;
-
             case 'chat_msg':
                 this.game.addChatMessage(data.sender, data.text);
                 break;
@@ -275,8 +271,14 @@ class NetworkManager {
                 if (!data.hit && data.reason) this.game.showToast(`⚔️ ${data.reason}`);
                 break;
 
-            case 'inventory_sync':
-                if (this.game.inventory) this.game.inventory.applyServerInventory(data.inventory);
+            case 'loot_granted':
+                // Merge each looted item into the current local inventory rather than
+                // overwriting it wholesale, so a stale server snapshot can never wipe out
+                // resources gathered locally moments ago that haven't round-tripped yet.
+                if (this.game.inventory && data.loot) {
+                    Object.entries(data.loot).forEach(([item, qty]) => this.game.inventory.grantResource(item, qty));
+                    this.game.showToast('📦 아이템을 획득했습니다!');
+                }
                 break;
 
             case 'appearance_changed':
@@ -332,12 +334,6 @@ class NetworkManager {
 
         if (blockType === 0) sfx.playBreak();
         else sfx.playPlace();
-    }
-
-    sendSaveMapRequest() {
-        this.send({
-            type: 'save_map'
-        });
     }
 
     sendHostLoadDecision(loadSavedMap) {
