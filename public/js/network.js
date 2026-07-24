@@ -17,7 +17,18 @@ class NetworkManager {
     }
 
     getServerUrl() {
-        const host = window.location.host || 'localhost:8000';
+        const host = window.location.host;
+
+        // If hosted on Cloudflare Pages (.pages.dev), GitHub Pages (.github.io), Netlify, or Vercel, connect to Render Python Backend!
+        if (host.includes('pages.dev') || host.includes('github.io') || host.includes('netlify.app') || host.includes('vercel.app')) {
+            return 'wss://king-math-craft.onrender.com/ws';
+        }
+
+        if (!host || host.includes('localhost') || host.includes('127.0.0.1')) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            return `${protocol}//${host || 'localhost:8000'}/ws`;
+        }
+
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         return `${protocol}//${host}/ws`;
     }
@@ -67,7 +78,7 @@ class NetworkManager {
 
         this.ws.onerror = (err) => {
             console.error('[Network] WebSocket Error:', err);
-            this.showLoginError('서버에 연결할 수 없습니다.');
+            this.showLoginError('서버에 연결할 수 없습니다. (Render 클라우드 서버가 자고 있을 경우 깨어나는 데 20초 정도 소요됩니다.)');
         };
 
         this.ws.onclose = () => {
