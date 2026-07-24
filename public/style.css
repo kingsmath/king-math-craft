@@ -354,7 +354,7 @@ body, html {
     font-weight: 600;
 }
 
-/* Touch Controls Overlay - Bottom Left Joystick & Bottom Right Actions */
+/* Touch Controls Overlay - Bottom Left Joystick & Bottom Right Actions Grid */
 #touch-controls {
     display: block; /* Always enabled for mobile/tablet & touch devices */
 }
@@ -395,17 +395,17 @@ body, html {
     position: absolute;
     bottom: 30px;
     right: 30px;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
     z-index: 15;
 }
 
 .touch-btn {
-    padding: 14px 20px;
+    padding: 12px 18px;
     border-radius: 14px;
     font-weight: 800;
-    font-size: 14px;
+    font-size: 13px;
     border: 1px solid rgba(255,255,255,0.3);
     color: #fff;
     cursor: pointer;
@@ -416,6 +416,12 @@ body, html {
 .btn-break { background: rgba(239, 68, 68, 0.65); }
 .btn-place { background: rgba(34, 197, 94, 0.65); }
 .btn-jump { background: rgba(59, 130, 246, 0.65); }
+.btn-sprint { background: rgba(168, 85, 247, 0.65); }
+.btn-sprint.active {
+    background: rgba(168, 85, 247, 0.95);
+    border-color: #f59e0b;
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.8);
+}
 
 /* Chat Box */
 #chat-container {

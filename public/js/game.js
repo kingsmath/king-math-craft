@@ -213,11 +213,11 @@ class VoxelWorld {
         // West Side (X <= -61, 8 Parcels up Z: 59 down to -60, each 15 deep)
         if (x <= -61) {
             if (45 <= z && z <= 59) return 25;
-            else if (30 <= z && z <= 44) return 26;
+            else if (30 <= z && z <= 37) return 26;
             else if (15 <= z && z <= 29) return 27;
             else if (0 <= z && z <= 14) return 28;
             else if (-15 <= z && z <= -1) return 29;
-            else if (-30 <= z && z <= -23) return 30;
+            else if (-30 <= z && z <= -16) return 30;
             else if (-45 <= z && z <= -31) return 31;
             else if (-60 <= z && z <= -46) return 32;
         }
@@ -523,9 +523,6 @@ class MinecraftGame {
             this.physics.keys.backward = normY > deadZone;
             this.physics.keys.right = normX > deadZone;
             this.physics.keys.left = normX < -deadZone;
-
-            // Auto Sprint if pushed past 80% radius
-            this.physics.keys.sprint = dist / maxRadius > 0.8;
         };
 
         const handleEnd = (e) => {
@@ -549,7 +546,6 @@ class MinecraftGame {
             this.physics.keys.backward = false;
             this.physics.keys.left = false;
             this.physics.keys.right = false;
-            this.physics.keys.sprint = false;
         };
 
         container.addEventListener('touchstart', handleStart);
@@ -611,6 +607,25 @@ class MinecraftGame {
             jumpBtn.addEventListener('touchend', jumpRelease);
             jumpBtn.addEventListener('mousedown', jumpPress);
             jumpBtn.addEventListener('mouseup', jumpRelease);
+        }
+
+        // Sprint Button (Bottom-Right)
+        const sprintBtn = document.getElementById('btn-touch-sprint');
+        if (sprintBtn) {
+            const toggleSprint = (e) => {
+                e.preventDefault();
+                this.physics.keys.sprint = !this.physics.keys.sprint;
+                if (this.physics.keys.sprint) {
+                    sprintBtn.classList.add('active');
+                } else {
+                    sprintBtn.classList.remove('active');
+                }
+            };
+            sprintBtn.addEventListener('click', toggleSprint);
+            sprintBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                toggleSprint(e);
+            }, { passive: false });
         }
 
         // Touch Drag for Camera Rotation on Canvas

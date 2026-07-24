@@ -26,11 +26,11 @@ class PlayerPhysics {
             sprint: false
         };
 
-        // Natural Minecraft Movement Speeds
-        this.walkSpeed = 10.0;
-        this.sprintSpeed = 16.0;
-        this.sneakSpeed = 4.0;
-        this.jumpForce = 9.2;
+        // Smooth Movement Speeds (Controlled & Natural)
+        this.walkSpeed = 6.5;
+        this.sprintSpeed = 10.5;
+        this.sneakSpeed = 3.0;
+        this.jumpForce = 8.5;
         this.gravity = 24.0;
 
         // Natural Head Bobbing Timer
@@ -163,8 +163,8 @@ class PlayerPhysics {
 
             // Natural Head Bobbing Effect while walking on ground
             if (this.onGround) {
-                this.bobTimer += delta * (this.keys.sprint ? 16.0 : 10.0);
-                this.currentBobOffset = Math.sin(this.bobTimer) * 0.05;
+                this.bobTimer += delta * (this.keys.sprint ? 14.0 : 8.0);
+                this.currentBobOffset = Math.sin(this.bobTimer) * 0.04;
             } else {
                 this.currentBobOffset *= 0.8;
             }
