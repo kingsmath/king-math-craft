@@ -145,7 +145,14 @@ class InventorySystem {
 
     grantFromBlockBreak(blockType) {
         const dropKey = BLOCK_DROP_MAP[blockType];
-        if (dropKey) this.grantResource(dropKey, 1);
+        if (dropKey) {
+            this.grantResource(dropKey, 1);
+            const icon = RESOURCE_ICONS[dropKey] || '📦';
+            const name = RESOURCE_NAMES[dropKey] || dropKey;
+            if (this.game && this.game.showToast) {
+                this.game.showToast(`🎒 ${icon} ${name} +1 (가방 저장)`);
+            }
+        }
         // Bonus chance at an extra sapling on top of the guaranteed leaves drop above
         if (blockType === BLOCK.LEAVES && Math.random() < 0.15) this.grantResource('sapling', 1);
     }

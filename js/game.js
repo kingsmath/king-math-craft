@@ -1113,8 +1113,9 @@ class MinecraftGame {
                     return;
                 }
                 const brokenType = this.world.getBlock(x, y, z);
-                this.net.sendBlockChange(x, y, z, 0);
-                this.inventory.grantFromBlockBreak(brokenType);
+                if (brokenType !== 0 && this.net.sendBlockChange(x, y, z, 0)) {
+                    this.inventory.grantFromBlockBreak(brokenType);
+                }
             }
         });
 
@@ -1365,8 +1366,9 @@ class MinecraftGame {
                         return;
                     }
                     const brokenType = this.world.getBlock(x, y, z);
-                    this.net.sendBlockChange(x, y, z, 0);
-                    this.inventory.grantFromBlockBreak(brokenType);
+                    if (brokenType !== 0 && this.net.sendBlockChange(x, y, z, 0)) {
+                        this.inventory.grantFromBlockBreak(brokenType);
+                    }
                 } else if (e.button === 2) {
                     const { x, y, z } = target.placeBlock;
                     const p = this.physics.position;

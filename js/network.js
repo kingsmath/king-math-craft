@@ -317,7 +317,7 @@ class NetworkManager {
 
         if (targetParcel !== 0 && targetParcel !== this.parcelNumber) {
             this.game.showToast(`⛔ [${targetParcel}번 땅] 남의 땅에는 블록을 설치/파괴할 수 없습니다!`);
-            return;
+            return false;
         }
 
         // Local instant update
@@ -334,6 +334,7 @@ class NetworkManager {
 
         if (blockType === 0) sfx.playBreak();
         else sfx.playPlace();
+        return true;
     }
 
     sendHostLoadDecision(loadSavedMap) {
