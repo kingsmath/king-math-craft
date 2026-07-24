@@ -95,21 +95,21 @@
         <div id="nametags-container"></div>
     </div>
 
-    <!-- Login Modal (Landing Screen - Cleaned Server Address Input) -->
+    <!-- Login Modal (Landing Screen) -->
     <div id="login-modal" class="modal-overlay">
         <div class="login-card glass-card">
             <div class="logo-area">
                 <div class="crown-logo">👑</div>
                 <h1>킹수학크래프트</h1>
-                <p class="subtitle">3D 실시간 동시접속 (30일 장기 보존)</p>
+                <p class="subtitle">3D 실시간 동시접속 (개인 번호 비밀번호 보안)</p>
             </div>
 
             <!-- 30-Day Purge Warning Alert Box -->
             <div class="purge-warning-box">
-                <span class="warning-icon">📅</span>
+                <span class="warning-icon">🔐</span>
                 <div class="warning-text">
-                    <strong>데이터 30일 장기 보존 안내</strong>
-                    <p>마지막 접속 후 <strong>30일 동안 접속하지 않으면</strong> 방 아이디와 지도가 <strong>자동 삭제</strong>됩니다. 지도를 평생 보존하려면 게임 내 <strong>[📥 지도 다운로드]</strong> 버튼을 이용해 주세요!</p>
+                    <strong>개인 번호 비밀번호 설정 안내</strong>
+                    <p>처음 선택하는 번호는 입력하신 비밀번호로 새롭게 등록됩니다. <strong>비밀번호를 꼭 기억해주세요!</strong> (30일 동안 지도가 보존됩니다)</p>
                 </div>
             </div>
 
@@ -120,8 +120,8 @@
                 </div>
 
                 <div class="input-group">
-                    <label for="password">비밀번호 (PW)</label>
-                    <input type="password" id="password" placeholder="비밀번호를 입력하세요" required autocomplete="current-password">
+                    <label for="password">방 비밀번호 (PW)</label>
+                    <input type="password" id="password" placeholder="방 비밀번호를 입력하세요" required autocomplete="current-password">
                 </div>
 
                 <!-- 1~32 Player Number Grid Selector -->
@@ -129,6 +129,11 @@
                     <label class="section-label">몇 번인가요? (개인 땅 1번~32번 선택)</label>
                     <div id="number-grid" class="number-grid"></div>
                     <input type="hidden" id="selected-number" value="1">
+                </div>
+
+                <div class="input-group" style="margin-top: 4px;">
+                    <label for="parcel-pin" style="color: #38bdf8;">선택한 번호 비밀번호 <span class="sub-label">(처음 설정시 기억 필수!)</span></label>
+                    <input type="password" id="parcel-pin" placeholder="숫자 비밀번호 입력 (예: 1234)" required maxlength="20" autocomplete="off">
                 </div>
 
                 <div id="login-error" class="error-msg hidden"></div>

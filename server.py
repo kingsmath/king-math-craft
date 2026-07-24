@@ -92,6 +92,7 @@ def load_rooms_data():
                         "password_hash": r_data.get("password_hash"),
                         "last_active": last_active,
                         "saved_world_edits": r_data.get("world_edits", {}),
+                        "parcel_passwords": r_data.get("parcel_passwords", {}),
                         "active_world_edits": {},
                         "active_sockets": {},
                         "occupied_numbers": set(),
@@ -116,7 +117,8 @@ def save_rooms_data():
                 "room_id": r_data["room_id"],
                 "password_hash": r_data["password_hash"],
                 "last_active": r_data["last_active"],
-                "world_edits": r_data.get("active_world_edits", r_data.get("saved_world_edits", {}))
+                "world_edits": r_data.get("active_world_edits", r_data.get("saved_world_edits", {})),
+                "parcel_passwords": r_data.get("parcel_passwords", {})
             }
 
         for k in expired_keys:
@@ -172,13 +174,14 @@ async def websocket_handler(request):
                 if msg_type == "login":
                     room_id = str(data.get("username", "")).strip()
                     password = str(data.get("password", "")).strip()
+                    parcel_pin = str(data.get("parcelPin", "")).strip()
                     player_num = int(data.get("playerNumber", 1))
 
-                    if not room_id or not password:
+                    if not room_id or not password or not parcel_pin:
                         await ws.send_str(json.dumps({
                             "type": "login_res",
                             "success": False,
-                            "message": "방 아이디와 비밀번호를 입력해주세요."
+                            "message": "방 아이디, 비밀번호, 번호 비밀번호를 모두 입력해주세요."
                         }))
                         continue
 
@@ -191,6 +194,7 @@ async def websocket_handler(request):
                         continue
 
                     pw_hash = hash_password(password)
+                    pin_hash = hash_password(parcel_pin)
                     room_key = f"{room_id}#{pw_hash}"
 
                     if room_key not in rooms:
@@ -199,6 +203,7 @@ async def websocket_handler(request):
                             "password_hash": pw_hash,
                             "last_active": time.time(),
                             "saved_world_edits": {},
+                            "parcel_passwords": {},
                             "active_world_edits": {},
                             "active_sockets": {},
                             "occupied_numbers": set(),
@@ -209,11 +214,28 @@ async def websocket_handler(request):
                     room = rooms[room_key]
                     room["last_active"] = time.time()
 
+                    # Number PIN Authentication Check
+                    parcel_str = str(player_num)
+                    if parcel_str not in room["parcel_passwords"]:
+                        # First time registering this number PIN!
+                        room["parcel_passwords"][parcel_str] = pin_hash
+                        save_rooms_data()
+                        print(f"[PIN] Created new PIN for Parcel {player_num} in Room '{room_id}'")
+                    else:
+                        # Validate existing number PIN
+                        if room["parcel_passwords"][parcel_str] != pin_hash:
+                            await ws.send_str(json.dumps({
+                                "type": "login_res",
+                                "success": False,
+                                "message": f"❌ {player_num}번의 번호 비밀번호가 일치하지 않습니다!"
+                            }))
+                            continue
+
                     if player_num in room["occupied_numbers"]:
                         await ws.send_str(json.dumps({
                             "type": "login_res",
                             "success": False,
-                            "message": f"{player_num}번은 이미 사용 중입니다. 다른 번호를 선택해주세요."
+                            "message": f"{player_num}번은 이미 접속 중입니다. 다른 번호를 선택해주세요."
                         }))
                         continue
 
@@ -236,7 +258,7 @@ async def websocket_handler(request):
                         "player_number": player_num,
                         "is_host": is_host,
                         "x": 0.0,
-                        "y": 15.0,
+                        "y": 5.0,
                         "z": 0.0,
                         "rotX": 0.0,
                         "rotY": 0.0,
@@ -442,7 +464,7 @@ if __name__ == "__main__":
     print(f"  [KING MATH CRAFT] Web Server Running!")
     print(f"  [URL] http://localhost:{PORT}")
     print(f"  [LIMIT] Max Players per Room: {MAX_PLAYERS_PER_ROOM}")
-    print(f"  [CLEANUP] Auto-Purge Inactive Rooms: 30 Days (2,592,000s)")
+    print(f"  [CLEANUP] Auto-Purge Inactive Rooms: 30 Days")
     print("=" * 60)
 
     app = create_app()

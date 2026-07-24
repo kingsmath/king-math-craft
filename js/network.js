@@ -1,4 +1,4 @@
-// WebSocket Network Manager for 킹수학크래프트 (Render & Cafe24 Pre-configured)
+// WebSocket Network Manager for 킹수학크래프트 (Number PIN Auth Supported)
 class NetworkManager {
     constructor(game) {
         this.game = game;
@@ -14,7 +14,7 @@ class NetworkManager {
         this.sendStateTimer = null;
     }
 
-    connect(username, password, playerNumber, customServerUrl = "") {
+    connect(username, password, parcelPin, playerNumber, customServerUrl = "") {
         this.username = username;
         this.playerNumber = playerNumber;
         
@@ -40,6 +40,7 @@ class NetworkManager {
                 type: 'login',
                 username: username,
                 password: password,
+                parcelPin: parcelPin,
                 playerNumber: playerNumber
             }));
         };
