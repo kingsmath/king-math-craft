@@ -11,7 +11,7 @@
         gtag('js', new Date());
         gtag('config', 'G-5YW0T2C109');
     </script>
-    <title>0.2.0킹수학크래프트</title>
+    <title>0.2.1킹수학크래프트</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,6 +34,7 @@
         <!-- Top Header Bar -->
         <div id="top-bar">
             <div class="top-left-group">
+                <button id="btn-fullscreen" class="btn-icon glass-panel" title="전체화면">⛶</button>
                 <button id="btn-toggle-controls" class="btn-icon glass-panel" title="조작법">❓</button>
                 <div id="room-badge" class="glass-panel">
                     <span id="display-room-name">수학방</span>
@@ -49,17 +50,13 @@
                 <button id="btn-character" class="btn-icon glass-panel" title="캐릭터 꾸미기">👤</button>
             </div>
 
-            <div id="daynight-clock" class="glass-panel">☀️ 06:00</div>
-
             <div class="top-right-group">
+                <div id="daynight-clock" class="glass-panel">☀️ 06:00</div>
                 <div id="scoreboard" class="glass-panel">
-                    <div class="score-header">
-                        <span class="status-dot"></span>
-                        <span id="player-count-badge" class="badge">1 / 32</span>
-                    </div>
+                    <span class="status-dot"></span>
+                    <span id="player-count-badge">1 / 32</span>
                     <ul id="player-list"></ul>
                 </div>
-                <button id="btn-fullscreen" class="btn-icon glass-panel" title="전체화면">⛶</button>
             </div>
         </div>
 
@@ -84,10 +81,11 @@
             <ul class="dropdown-controls-list">
                 <li><span class="key">WASD</span> / <span class="key">터치 조이스틱</span> 이동</li>
                 <li><span class="key">Space</span> 점프 / <span class="key">Ctrl</span> 달리기 / <span class="key">Shift</span> 숙이기</li>
+                <li><span class="key">E</span> / <span class="key">I</span> / <span class="key">🎒 버튼</span> 인벤토리(가방) 열기/닫기</li>
                 <li><span class="key">좌클릭</span> 파괴 (몬스터/동물/PVP 상대를 조준하면 공격) / <span class="key">우클릭</span> 설치</li>
                 <li><span class="key">F</span> 제작대·화로·호수 상호작용 (제작/요리/낚시)</li>
                 <li><span class="key">1~9</span> / <span class="key">휠</span> 핫바 9슬롯 선택</li>
-                <li><span class="key">H</span> 조작법 창 열기/닫기</li>
+                <li><span class="key">H</span> / <span class="key">❓ 버튼</span> 조작법 창 열기/닫기</li>
                 <li><span class="key">T</span> / <span class="key">Enter</span> 채팅창 열기, <span class="key">Esc</span> 채팅창 닫기</li>
                 <li>🌙 밤에는 동굴 근처에 몬스터가 출현하고, ☀️ 아침이 되면 동굴 밖 몬스터는 불타 사라집니다.</li>
                 <li>⚔️ PVP 아레나(남동쪽) 안에서만 서로 공격할 수 있습니다.</li>
@@ -231,7 +229,7 @@
             <div class="logo-area">
                 <div class="crown-logo">👑</div>
                 <h1>킹수학크래프트</h1>
-                <p class="subtitle">데모버전 0.2.0(202607241621)</p>
+                <p class="subtitle">데모버전 0.2.1(202607241624)</p>
             </div>
 
             <!-- First-Come First-Served Ownership Detailed Guide Alert Box -->

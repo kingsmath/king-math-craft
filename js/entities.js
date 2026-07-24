@@ -160,14 +160,36 @@ class EntityManager {
             group.userData.legs = legs;
         } else {
             // zombie / skeleton: humanoid like the player mesh
-            const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-            const head = new THREE.Mesh(headGeo, skinMat);
-            head.position.y = 1.5;
-            group.add(head);
-            const bodyGeo = new THREE.BoxGeometry(0.5, 0.7, 0.3);
-            const body = new THREE.Mesh(bodyGeo, clothMat);
-            body.position.y = 0.9;
-            group.add(body);
+        if (type === 'cow' || type === 'pig' || type === 'bear') {
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 1.2), clothMat);
+            body.position.y = 0.7;
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
+            head.position.set(0, 1.1, 0.7);
+            group.add(body, head);
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x27272a });
+            const fl = createLimbPivotMesh(0.22, 0.6, 0.22, legMat, -0.3, 0.6, 0.4);
+            const fr = createLimbPivotMesh(0.22, 0.6, 0.22, legMat, 0.3, 0.6, 0.4);
+            const bl = createLimbPivotMesh(0.22, 0.6, 0.22, legMat, -0.3, 0.6, -0.4);
+            const br = createLimbPivotMesh(0.22, 0.6, 0.22, legMat, 0.3, 0.6, -0.4);
+            group.add(fl, fr, bl, br);
+            group.userData.legs = [fl, fr, bl, br];
+        } else if (type === 'chicken') {
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.5), skinMat);
+            body.position.y = 0.4;
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 0.25), clothMat);
+            head.position.set(0, 0.65, 0.2);
+            group.add(body, head);
+            const legMat = new THREE.MeshStandardMaterial({ color: 0xd97706 });
+            const fl = createLimbPivotMesh(0.08, 0.3, 0.08, legMat, -0.1, 0.3, 0);
+            const fr = createLimbPivotMesh(0.08, 0.3, 0.08, legMat, 0.1, 0.3, 0);
+            group.add(fl, fr);
+            group.userData.legs = [fl, fr];
+        } else {
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.75, 0.3), clothMat);
+            body.position.y = 1.275;
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
+            head.position.y = 1.9;
+            group.add(body, head);
             const leftArm = createLimbPivotMesh(0.2, 0.65, 0.2, skinMat, -0.35, 1.245, 0);
             const rightArm = createLimbPivotMesh(0.2, 0.65, 0.2, skinMat, 0.35, 1.245, 0);
             group.add(leftArm, rightArm);
@@ -179,16 +201,16 @@ class EntityManager {
             group.userData.arms = [leftArm, rightArm];
         }
 
-        // Floating HP bar
+        // Floating HP bar wrapped in billboard group
+        const hpGroup = new THREE.Group();
+        hpGroup.position.y = 2.0;
         const barBg = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.09), new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.6, transparent: true }));
         const barFg = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.07), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-        barBg.position.y = 2.0;
-        barFg.position.y = 2.0;
         barFg.position.z = 0.001;
-        group.add(barBg, barFg);
+        hpGroup.add(barBg, barFg);
+        group.add(hpGroup);
+        group._hpGroup = hpGroup;
         group._hpBarFg = barFg;
-
-        const label = { group };
         Object.defineProperty(group, 'hpBarFgRef', { value: barFg });
         return group;
     }
@@ -197,9 +219,7 @@ class EntityManager {
         this.entities.forEach((ent) => {
             ent.group.position.lerp(ent.targetPos, Math.min(1, delta * 8.0));
             ent.group.rotation.y = ent.targetRotY;
-            ent.group.children.forEach((c) => {
-                if (c.geometry && c.geometry.type === 'PlaneGeometry') c.lookAt(this.game.camera.position);
-            });
+            if (ent.group._hpGroup) ent.group._hpGroup.lookAt(this.game.camera.position);
             if (!ent.hpBarFg) ent.hpBarFg = ent.group.hpBarFgRef;
 
             // Mobs wander/chase almost continuously, so just always animate their walk cycle

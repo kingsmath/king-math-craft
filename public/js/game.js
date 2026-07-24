@@ -1318,6 +1318,15 @@ class MinecraftGame {
                 toggleDropdown();
             }
 
+            // 'E' or 'I' key toggles inventory panel
+            if (e.code === 'KeyE' || e.code === 'KeyI') {
+                const invPanel = document.getElementById('inventory-panel');
+                if (invPanel) {
+                    invPanel.classList.toggle('hidden');
+                    if (!invPanel.classList.contains('hidden')) this.inventory.renderInventoryPanel();
+                }
+            }
+
             // 'F' key interacts with crafting table / furnace / water (fishing)
             if (e.code === 'KeyF') {
                 this.inventory.handleInteract();

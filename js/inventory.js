@@ -296,20 +296,15 @@ class InventorySystem {
             return;
         }
         if (this.fishing.active) return;
-        const target = this.game.physics.raycastTarget(6.0);
-        if (!target.hit || this.game.world.getBlock(target.targetBlock.x, target.targetBlock.y, target.targetBlock.z) !== BLOCK.WATER) {
-            this.game.showToast('⚠️ 호수 물을 조준하고 낚시해주세요.');
-            return;
-        }
         this.fishing.active = true;
         this.game.showToast('🎣 낚싯줄을 던졌습니다... 기다리는 중');
         const waitTime = 2200 + Math.random() * 3200;
         setTimeout(() => {
             if (!this.fishing.active) return;
             this.fishing.active = false;
-            if (Math.random() < 0.82) {
+            if (Math.random() < 0.85) {
                 this.grantResource('raw_fish', 1);
-                this.game.showToast('🐟 물고기를 낚았습니다!');
+                this.game.showToast('🐟 물고기를 낚았습니다! (가방 저장)');
             } else {
                 this.game.showToast('💦 아쉽게 놓쳤습니다...');
             }
@@ -318,14 +313,18 @@ class InventorySystem {
 
     // --- Interact key (F): crafting table / furnace / fishing ------------
     handleInteract() {
-        const target = this.game.physics.raycastTarget(4.5);
+        const target = this.game.physics.raycastTarget(5.0);
         if (target.hit) {
-            const block = this.game.world.getBlock(target.targetBlock.x, target.targetBlock.y, target.targetBlock.z);
+            const { x, y, z } = target.targetBlock;
+            const block = this.game.world.getBlock(x, y, z);
             if (block === BLOCK.CRAFTING_TABLE) { this.openCrafting(); return; }
             if (block === BLOCK.FURNACE) { this.openFurnace(); return; }
-            if (block === BLOCK.WATER) { this.startFishing(); return; }
+            if (block === BLOCK.WATER || this.game.world.getBlock(x, y - 1, z) === BLOCK.WATER || inZone(x, z, ZONES.LAKE_BASIN)) {
+                this.startFishing();
+                return;
+            }
         }
-        this.game.showToast('ℹ️ 제작대/화로/호수를 조준하고 F를 눌러보세요.');
+        this.game.showToast('ℹ️ 제작대/화로/호수를 조준하고 F(또는 ✋)를 눌러보세요.');
     }
 
     // --- Hunger tick (called every frame) ---------------------------------

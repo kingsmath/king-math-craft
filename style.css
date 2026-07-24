@@ -218,17 +218,13 @@ body, html {
 }
 
 #scoreboard {
-    padding: 10px 14px;
-    min-width: 70px;
-}
-
-.score-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-muted);
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
 }
 
 .status-dot {
@@ -237,15 +233,6 @@ body, html {
     background-color: var(--accent-green);
     border-radius: 50%;
     box-shadow: 0 0 8px var(--accent-green);
-}
-
-.badge {
-    background: rgba(59, 130, 246, 0.3);
-    color: #60a5fa;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 700;
 }
 
 #player-list {
