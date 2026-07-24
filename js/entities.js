@@ -20,6 +20,17 @@ function raySphereHitTest(eye, dir, targets, maxDist, radius) {
     return best;
 }
 
+// A limb is a pivot Group positioned at the joint (shoulder/hip) with its box mesh hanging
+// below, so rotating the pivot swings the limb around the joint instead of its own center.
+function createLimbPivotMesh(w, h, d, mat, jointX, jointY, jointZ) {
+    const pivot = new THREE.Group();
+    pivot.position.set(jointX, jointY, jointZ);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    mesh.position.y = -h / 2;
+    pivot.add(mesh);
+    return pivot;
+}
+
 const MOB_COLORS = {
     zombie: { skin: 0x2e7d32, cloth: 0x1e293b },
     skeleton: { skin: 0xe5e7eb, cloth: 0x9ca3af },
@@ -139,12 +150,14 @@ class EntityManager {
             const head = new THREE.Mesh(headGeo, clothMat);
             head.position.set(0, 0.75 * scale, 0.75 * scale);
             group.add(head);
-            const legGeo = new THREE.BoxGeometry(0.18 * scale, 0.5 * scale, 0.18 * scale);
+            const legH = 0.5 * scale;
+            const legs = [];
             [[-0.28, -0.45], [0.28, -0.45], [-0.28, 0.45], [0.28, 0.45]].forEach(([lx, lz]) => {
-                const leg = new THREE.Mesh(legGeo, clothMat);
-                leg.position.set(lx * scale, 0.25 * scale, lz * scale);
+                const leg = createLimbPivotMesh(0.18 * scale, legH, 0.18 * scale, clothMat, lx * scale, legH, lz * scale);
                 group.add(leg);
+                legs.push(leg);
             });
+            group.userData.legs = legs;
         } else {
             // zombie / skeleton: humanoid like the player mesh
             const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
@@ -155,19 +168,15 @@ class EntityManager {
             const body = new THREE.Mesh(bodyGeo, clothMat);
             body.position.y = 0.9;
             group.add(body);
-            const armGeo = new THREE.BoxGeometry(0.2, 0.65, 0.2);
-            const leftArm = new THREE.Mesh(armGeo, skinMat);
-            leftArm.position.set(-0.35, 0.92, 0);
-            const rightArm = new THREE.Mesh(armGeo, skinMat);
-            rightArm.position.set(0.35, 0.92, 0);
+            const leftArm = createLimbPivotMesh(0.2, 0.65, 0.2, skinMat, -0.35, 1.245, 0);
+            const rightArm = createLimbPivotMesh(0.2, 0.65, 0.2, skinMat, 0.35, 1.245, 0);
             group.add(leftArm, rightArm);
-            const legGeo = new THREE.BoxGeometry(0.22, 0.65, 0.22);
             const legMat = new THREE.MeshStandardMaterial({ color: 0x1f2937 });
-            const leftLeg = new THREE.Mesh(legGeo, legMat);
-            leftLeg.position.set(-0.13, 0.325, 0);
-            const rightLeg = new THREE.Mesh(legGeo, legMat);
-            rightLeg.position.set(0.13, 0.325, 0);
+            const leftLeg = createLimbPivotMesh(0.22, 0.65, 0.22, legMat, -0.13, 0.65, 0);
+            const rightLeg = createLimbPivotMesh(0.22, 0.65, 0.22, legMat, 0.13, 0.65, 0);
             group.add(leftLeg, rightLeg);
+            group.userData.legs = [leftLeg, rightLeg];
+            group.userData.arms = [leftArm, rightArm];
         }
 
         // Floating HP bar
@@ -192,6 +201,18 @@ class EntityManager {
                 if (c.geometry && c.geometry.type === 'PlaneGeometry') c.lookAt(this.game.camera.position);
             });
             if (!ent.hpBarFg) ent.hpBarFg = ent.group.hpBarFgRef;
+
+            // Mobs wander/chase almost continuously, so just always animate their walk cycle
+            ent.walkTime = (ent.walkTime || 0) + delta * 7.0;
+            const swing = Math.sin(ent.walkTime) * 0.5;
+            const ud = ent.group.userData;
+            if (ud && ud.legs) {
+                ud.legs.forEach((leg, i) => { leg.rotation.x = (i % 2 === 0 ? swing : -swing); });
+            }
+            if (ud && ud.arms) {
+                ud.arms[0].rotation.x = -swing;
+                ud.arms[1].rotation.x = swing;
+            }
         });
     }
 

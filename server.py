@@ -160,7 +160,7 @@ def default_inventory():
 
 
 def default_appearance():
-    return {"skin": "#ffdbac", "shirt": "#3b82f6", "pants": "#1e3a8a", "hat": "none"}
+    return {"skin": "#ffdbac", "shirt": "#3b82f6", "pants": "#1e3a8a", "hair": "short", "expression": "smile"}
 
 
 def load_rooms_data():

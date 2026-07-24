@@ -1453,8 +1453,11 @@ class MinecraftGame {
         this.physics.update(delta);
 
         if (this.viewmodelArm) {
+            const isWalking = this.physics.keys.forward || this.physics.keys.backward || this.physics.keys.left || this.physics.keys.right;
+            const swing = isWalking && this.physics.onGround ? Math.sin(this.physics.bobTimer) * 0.3 : 0;
             this.viewmodelArm.position.y = -0.42 + this.physics.currentBobOffset * 1.6;
             this.viewmodelArm.position.x = 0.32 + this.physics.currentBobOffset * 0.8;
+            this.viewmodelArm.rotation.x = 0.35 + swing;
         }
 
         const eyePos = this.physics.getEyePosition();
@@ -1484,18 +1487,26 @@ class MinecraftGame {
     }
 
     // ==================================================================
-    // Character Customization (skin / shirt / pants / hat)
+    // Character Customization (skin / shirt / pants / hairstyle / expression)
     // ==================================================================
     initCharacterCustomization() {
         const SKIN_COLORS = ['#ffdbac', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#3b2417'];
         const SHIRT_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#111827', '#f8fafc'];
         const PANTS_COLORS = ['#1e3a8a', '#374151', '#78350f', '#166534', '#111827', '#7c2d12'];
-        const HATS = [{ id: 'none', label: '없음' }, { id: 'crown', label: '👑 왕관' }];
+        const HAIRSTYLES = [
+            { id: 'bald', label: '민머리' }, { id: 'short', label: '짧은머리' }, { id: 'long', label: '장발' },
+            { id: 'ponytail', label: '포니테일' }, { id: 'mohawk', label: '모히칸' }
+        ];
+        const EXPRESSIONS = [
+            { id: 'smile', label: '😊 미소' }, { id: 'neutral', label: '😐 무표정' }, { id: 'surprised', label: '😲 놀람' },
+            { id: 'cool', label: '😎 쿨' }, { id: 'angry', label: '😠 화남' }
+        ];
 
-        this.appearance = { skin: SKIN_COLORS[0], shirt: SHIRT_COLORS[5], pants: PANTS_COLORS[0], hat: 'none' };
+        this.appearance = { skin: SKIN_COLORS[0], shirt: SHIRT_COLORS[5], pants: PANTS_COLORS[0], hair: 'short', expression: 'smile' };
         try {
             const saved = localStorage.getItem('kmc_appearance');
             if (saved) this.appearance = Object.assign(this.appearance, JSON.parse(saved));
+            delete this.appearance.hat; // legacy field, no longer used
         } catch (e) { /* ignore corrupt storage */ }
 
         const buildSwatchRow = (containerId, key, values, isColor) => {
@@ -1504,7 +1515,7 @@ class MinecraftGame {
             container.innerHTML = '';
             values.forEach((v) => {
                 const el = document.createElement('div');
-                el.className = isColor ? 'swatch' : 'swatch hat-swatch';
+                el.className = isColor ? 'swatch' : 'swatch label-swatch';
                 if (isColor) el.style.background = v;
                 else el.innerText = v.label;
                 const value = isColor ? v : v.id;
@@ -1527,7 +1538,8 @@ class MinecraftGame {
                 buildSwatchRow('swatch-skin', 'skin', SKIN_COLORS, true);
                 buildSwatchRow('swatch-shirt', 'shirt', SHIRT_COLORS, true);
                 buildSwatchRow('swatch-pants', 'pants', PANTS_COLORS, true);
-                buildSwatchRow('swatch-hat', 'hat', HATS, false);
+                buildSwatchRow('swatch-hair', 'hair', HAIRSTYLES, false);
+                buildSwatchRow('swatch-expression', 'expression', EXPRESSIONS, false);
             });
         }
         const closeBtn = document.getElementById('btn-close-character');
