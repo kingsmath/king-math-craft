@@ -118,7 +118,7 @@
             <div class="logo-area">
                 <div class="crown-logo">👑</div>
                 <h1>킹수학크래프트</h1>
-                <p class="subtitle">3D 실시간 동시접속 (액티브 터치 조이스틱 지원)</p>
+                <p class="subtitle">3D 실시간 동시접속 (32개 개인땅 번호 선택)</p>
             </div>
 
             <!-- First-Come First-Served Ownership Detailed Guide Alert Box -->
@@ -145,10 +145,43 @@
                     <input type="password" id="password" placeholder="방 비밀번호를 입력하세요" required autocomplete="current-password">
                 </div>
 
-                <!-- 1~32 Player Number Grid Selector -->
+                <!-- 1~32 Player Number Grid Selector (Pre-rendered for Instant Loading) -->
                 <div class="number-selector-section">
-                    <label class="section-label">몇 번인가요? (가로15x세로15 개인 땅 선택)</label>
-                    <div id="number-grid" class="number-grid"></div>
+                    <label class="section-label">몇 번인가요? (1번~32번 땅 클릭 선택)</label>
+                    <div id="number-grid" class="number-grid">
+                        <button type="button" class="num-btn selected" data-num="1">1번</button>
+                        <button type="button" class="num-btn" data-num="2">2번</button>
+                        <button type="button" class="num-btn" data-num="3">3번</button>
+                        <button type="button" class="num-btn" data-num="4">4번</button>
+                        <button type="button" class="num-btn" data-num="5">5번</button>
+                        <button type="button" class="num-btn" data-num="6">6번</button>
+                        <button type="button" class="num-btn" data-num="7">7번</button>
+                        <button type="button" class="num-btn" data-num="8">8번</button>
+                        <button type="button" class="num-btn" data-num="9">9번</button>
+                        <button type="button" class="num-btn" data-num="10">10번</button>
+                        <button type="button" class="num-btn" data-num="11">11번</button>
+                        <button type="button" class="num-btn" data-num="12">12번</button>
+                        <button type="button" class="num-btn" data-num="13">13번</button>
+                        <button type="button" class="num-btn" data-num="14">14번</button>
+                        <button type="button" class="num-btn" data-num="15">15번</button>
+                        <button type="button" class="num-btn" data-num="16">16번</button>
+                        <button type="button" class="num-btn" data-num="17">17번</button>
+                        <button type="button" class="num-btn" data-num="18">18번</button>
+                        <button type="button" class="num-btn" data-num="19">19번</button>
+                        <button type="button" class="num-btn" data-num="20">20번</button>
+                        <button type="button" class="num-btn" data-num="21">21번</button>
+                        <button type="button" class="num-btn" data-num="22">22번</button>
+                        <button type="button" class="num-btn" data-num="23">23번</button>
+                        <button type="button" class="num-btn" data-num="24">24번</button>
+                        <button type="button" class="num-btn" data-num="25">25번</button>
+                        <button type="button" class="num-btn" data-num="26">26번</button>
+                        <button type="button" class="num-btn" data-num="27">27번</button>
+                        <button type="button" class="num-btn" data-num="28">28번</button>
+                        <button type="button" class="num-btn" data-num="29">29번</button>
+                        <button type="button" class="num-btn" data-num="30">30번</button>
+                        <button type="button" class="num-btn" data-num="31">31번</button>
+                        <button type="button" class="num-btn" data-num="32">32번</button>
+                    </div>
                     <input type="hidden" id="selected-number" value="1">
                 </div>
 
@@ -189,6 +222,29 @@
             </div>
         </div>
     </div>
+
+    <!-- Immediate Global Script for Number Grid Selector -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const hiddenInput = document.getElementById('selected-number');
+            const buttons = document.querySelectorAll('.num-btn');
+            
+            buttons.forEach(function(btn) {
+                function select() {
+                    buttons.forEach(function(b) { b.classList.remove('selected'); });
+                    btn.classList.add('selected');
+                    if (hiddenInput) hiddenInput.value = btn.getAttribute('data-num');
+                }
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    select();
+                });
+                btn.addEventListener('touchstart', function(e) {
+                    select();
+                }, { passive: true });
+            });
+        });
+    </script>
 
     <!-- Scripts -->
     <script src="js/audio.js"></script>
