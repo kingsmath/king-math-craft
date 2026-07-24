@@ -17,7 +17,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 # Configurations
 HOST = "0.0.0.0"
 PORT = 8000
-MAX_PLAYERS_PER_ROOM = 30
+MAX_PLAYERS_PER_ROOM = 32  # Up to 32 players (1번~32번) simultaneously
 DATA_PURGE_TIMEOUT = 30 * 24 * 3600  # 30 days in seconds (2,592,000s)
 
 BASE_DIR = Path(__file__).parent
