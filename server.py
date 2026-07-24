@@ -1015,9 +1015,19 @@ async def index_handler(request):
 
 async def check_room_handler(request):
     room_id = request.query.get("id", "").strip()
-    exists = any(r.get("room_id") == room_id for r in rooms.values())
+    matched_room = next((r for r in rooms.values() if r.get("room_id") == room_id), None)
+    registered_numbers = []
+    if matched_room:
+        try:
+            registered_numbers = sorted(int(n) for n in matched_room.get("parcel_passwords", {}).keys())
+        except (TypeError, ValueError):
+            registered_numbers = []
     return web.json_response(
-        {"exists": exists, "valid_length": len(room_id) >= 4},
+        {
+            "exists": matched_room is not None,
+            "valid_length": len(room_id) >= 4,
+            "registered_numbers": registered_numbers,
+        },
         headers={"Access-Control-Allow-Origin": "*"}
     )
 

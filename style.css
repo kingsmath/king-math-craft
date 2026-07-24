@@ -162,6 +162,64 @@ body, html {
 #btn-save-map { background: rgba(34, 197, 94, 0.4); }
 #btn-save-map:hover { background: rgba(34, 197, 94, 0.8); }
 
+.btn-invite {
+    height: 42px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.3);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.btn-invite:hover {
+    background: rgba(245, 158, 11, 0.7);
+    transform: translateY(-2px);
+}
+
+/* Invite Modal */
+.invite-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+#invite-qr-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+    background: #fff;
+    border-radius: 12px;
+}
+
+#invite-qr-wrap img {
+    display: block;
+    width: 220px;
+    height: 220px;
+}
+
+.invite-link-row {
+    display: flex;
+    gap: 8px;
+}
+
+#invite-link-input {
+    flex: 1;
+    padding: 10px 12px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
 #scoreboard {
     padding: 10px 16px;
     min-width: 160px;
@@ -605,6 +663,31 @@ body, html {
 .room-id-status.checking { color: var(--text-muted); }
 .room-id-status.info { color: #38bdf8; }
 .room-id-status.ok { color: var(--accent-green); }
+.room-id-status.taken { color: #fb923c; }
+
+.warn-strong {
+    color: #fca5a5;
+}
+
+.number-legend {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+.legend-dot.free { background: rgba(255, 255, 255, 0.15); margin-left: 0; }
+.legend-dot.taken { background: #f97316; }
 
 /* Pre-rendered 32 Parcel Number Grid */
 .number-selector-section {
@@ -655,6 +738,19 @@ body, html {
     box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
 }
 
+/* Already-registered land numbers, shown once the room id has been looked up */
+.num-btn.registered {
+    background: rgba(249, 115, 22, 0.28);
+    border-color: rgba(249, 115, 22, 0.6);
+    color: #fed7aa;
+}
+
+.num-btn.registered.selected {
+    background: #f97316;
+    border-color: #fb923c;
+    color: #1c0a00;
+}
+
 .btn-primary {
     padding: 12px 20px;
     background: linear-gradient(135deg, var(--primary), var(--primary-hover));
@@ -676,10 +772,21 @@ body, html {
     box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
 }
 
+/* Row holding the login button + the "other games" link side by side */
+.login-actions-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.login-actions-row #btn-login {
+    flex: 1;
+}
+
 /* "월드 입장하기" Login Button - extra polish with a gold/blue glow pulse */
 #btn-login {
-    padding: 16px 24px;
-    font-size: 17px;
+    padding: 12px 18px;
+    font-size: 16px;
     letter-spacing: 0.3px;
     background: linear-gradient(135deg, #2563eb, #3b82f6 55%, #f59e0b);
     box-shadow: 0 8px 22px rgba(59, 130, 246, 0.45);
@@ -709,18 +816,16 @@ body, html {
     flex-shrink: 0;
 }
 
-/* Top-right "다른 게임 고르기" link on the landing screen */
+/* "다른 게임 고르기" link, sits beside the login button */
 #other-games-link {
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    z-index: 110;
-    padding: 9px 16px;
-    background: rgba(15, 23, 42, 0.75);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 0 16px;
+    background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 30px;
+    border-radius: 10px;
     color: #fff;
     font-size: 13px;
     font-weight: 700;
@@ -729,8 +834,8 @@ body, html {
 }
 
 #other-games-link:hover {
-    background: rgba(59, 130, 246, 0.55);
-    border-color: rgba(59, 130, 246, 0.8);
+    background: rgba(59, 130, 246, 0.4);
+    border-color: rgba(59, 130, 246, 0.7);
     transform: translateY(-2px);
 }
 

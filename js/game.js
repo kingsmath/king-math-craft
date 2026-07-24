@@ -717,6 +717,8 @@ class MinecraftGame {
         this.initCharacterCustomization();
         this.initRoomIdCheck();
         this.initViewmodelArm();
+        this.initInviteFeature();
+        this.applyJoinLinkPrefill();
     }
 
     // First-person view-model arm attached to the camera (visible only to the local player)
@@ -753,11 +755,13 @@ class MinecraftGame {
             if (val.length === 0) {
                 statusEl.textContent = '';
                 statusEl.className = 'room-id-status';
+                this.applyNumberRegistrationColors(null);
                 return;
             }
             if (val.length < 4) {
                 statusEl.textContent = '⚠️ 4글자 이상 입력해주세요';
                 statusEl.className = 'room-id-status warn';
+                this.applyNumberRegistrationColors(null);
                 return;
             }
 
@@ -775,12 +779,76 @@ class MinecraftGame {
                         statusEl.textContent = '✅ 사용 가능한 이름이에요!';
                         statusEl.className = 'room-id-status ok';
                     }
+                    this.applyNumberRegistrationColors(result.registered_numbers || []);
                 } catch (e) {
                     statusEl.textContent = '';
                     statusEl.className = 'room-id-status';
                 }
             }, 450);
         });
+    }
+
+    // If arriving via an invite link (?room=...&pw=...), pre-fill the room id/password so the
+    // visitor only has to pick a land number and set their own number password.
+    applyJoinLinkPrefill() {
+        const params = new URLSearchParams(window.location.search);
+        const room = params.get('room');
+        const pw = params.get('pw');
+        if (!room && !pw) return;
+
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        if (room && usernameInput) {
+            usernameInput.value = room;
+            usernameInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (pw && passwordInput) passwordInput.value = pw;
+
+        const pinInput = document.getElementById('parcel-pin');
+        if (pinInput) pinInput.focus();
+        this.showToast('📨 초대 링크로 들어왔어요! 번호와 번호 비밀번호만 정하면 돼요.');
+    }
+
+    // Friend-invite QR code: encodes a link that pre-fills this room's id/password for the visitor.
+    initInviteFeature() {
+        const btn = document.getElementById('btn-invite');
+        const modal = document.getElementById('invite-modal');
+        const closeBtn = document.getElementById('btn-close-invite');
+        const qrImg = document.getElementById('invite-qr-img');
+        const linkInput = document.getElementById('invite-link-input');
+        const copyBtn = document.getElementById('btn-copy-invite');
+        if (!btn || !modal) return;
+
+        btn.addEventListener('click', () => {
+            const roomId = this.net.username;
+            const password = this.net.password;
+            if (!roomId) {
+                this.showToast('⚠️ 먼저 방에 접속한 뒤 초대할 수 있어요.');
+                return;
+            }
+            const url = new URL(window.location.origin + window.location.pathname);
+            url.searchParams.set('room', roomId);
+            url.searchParams.set('pw', password || '');
+            const inviteUrl = url.toString();
+
+            if (qrImg) qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(inviteUrl)}`;
+            if (linkInput) linkInput.value = inviteUrl;
+            modal.classList.remove('hidden');
+        });
+
+        if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+
+        if (copyBtn && linkInput) {
+            copyBtn.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(linkInput.value);
+                } catch (e) {
+                    linkInput.select();
+                    document.execCommand('copy');
+                }
+                this.showToast('📋 초대 링크를 복사했어요!');
+            });
+        }
     }
 
     initLighting() {
@@ -802,12 +870,13 @@ class MinecraftGame {
         if (!grid || !hiddenInput) return;
 
         grid.innerHTML = '';
+        this.registeredNumbers = new Set();
 
         const selectNumber = (num, btnElement) => {
             document.querySelectorAll('.num-btn').forEach(b => b.classList.remove('selected'));
             if (btnElement) btnElement.classList.add('selected');
             hiddenInput.value = String(num);
-            console.log(`[UI] Selected Parcel Number: ${num}`);
+            this.updateParcelStatusMessage(num);
         };
 
         for (let i = 1; i <= 32; i++) {
@@ -827,6 +896,37 @@ class MinecraftGame {
             btn.addEventListener('touchstart', handleSelect, { passive: false });
 
             grid.appendChild(btn);
+        }
+    }
+
+    // Recolor the 1~32 grid to mark numbers already registered in the typed room id.
+    // Pass null to reset to the "not checked yet" state (input empty/too short).
+    applyNumberRegistrationColors(registeredNumbers) {
+        this.roomIdChecked = registeredNumbers !== null;
+        this.registeredNumbers = new Set(registeredNumbers || []);
+        document.querySelectorAll('.num-btn').forEach((btn) => {
+            const num = parseInt(btn.dataset.num, 10);
+            btn.classList.toggle('registered', this.registeredNumbers.has(num));
+        });
+        const selectedInput = document.getElementById('selected-number');
+        if (selectedInput) this.updateParcelStatusMessage(parseInt(selectedInput.value || '1', 10));
+    }
+
+    updateParcelStatusMessage(num) {
+        const statusEl = document.getElementById('parcel-status');
+        if (!statusEl) return;
+        if (!this.roomIdChecked) {
+            statusEl.textContent = '';
+            statusEl.className = 'room-id-status';
+            return;
+        }
+        const set = this.registeredNumbers || new Set();
+        if (set.has(num)) {
+            statusEl.textContent = `⚠️ ${num}번은 이미 등록된 번호입니다. 비밀번호를 입력하세요.`;
+            statusEl.className = 'room-id-status taken';
+        } else {
+            statusEl.textContent = `🆕 ${num}번은 새 번호예요. 비밀번호를 새로 만들고 꼭 기억하세요!`;
+            statusEl.className = 'room-id-status ok';
         }
     }
 

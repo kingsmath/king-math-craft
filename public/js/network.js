@@ -61,6 +61,7 @@ class NetworkManager {
 
     connect(username, password, parcelPin, playerNum) {
         this.username = username;
+        this.password = password;
         this.parcelNumber = playerNum;
         this.game.physics.playerNumber = playerNum;
 
