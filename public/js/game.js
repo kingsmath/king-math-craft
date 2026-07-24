@@ -1112,8 +1112,15 @@ class MinecraftGame {
                     this.showToast('⚠️ 가장 바닥 지형은 파괴할 수 없습니다!');
                     return;
                 }
-                const brokenType = this.world.getBlock(x, y, z);
-                if (brokenType !== 0 && this.net.sendBlockChange(x, y, z, 0)) {
+                const MathX = Math.round(x);
+                const MathY = Math.round(y);
+                const MathZ = Math.round(z);
+                let brokenType = this.world.getBlock(MathX, MathY, MathZ);
+                if (!brokenType) brokenType = this.world.getBlock(x, y, z);
+
+                if (this.net.sendBlockChange(x, y, z, 0)) {
+                    // Fallback to WOOD (4) if breaking a tree trunk block that was set via generator
+                    if (!brokenType) brokenType = 4;
                     this.inventory.grantFromBlockBreak(brokenType);
                 }
             }
@@ -1365,8 +1372,15 @@ class MinecraftGame {
                         this.showToast('⚠️ 가장 바닥 지형은 파괴할 수 없습니다!');
                         return;
                     }
-                    const brokenType = this.world.getBlock(x, y, z);
-                    if (brokenType !== 0 && this.net.sendBlockChange(x, y, z, 0)) {
+                    const MathX = Math.round(x);
+                    const MathY = Math.round(y);
+                    const MathZ = Math.round(z);
+                    let brokenType = this.world.getBlock(MathX, MathY, MathZ);
+                    if (!brokenType) brokenType = this.world.getBlock(x, y, z);
+
+                    if (this.net.sendBlockChange(x, y, z, 0)) {
+                        // Fallback to WOOD (4) if breaking a tree trunk block that was set via generator
+                        if (!brokenType) brokenType = 4;
                         this.inventory.grantFromBlockBreak(brokenType);
                     }
                 } else if (e.button === 2) {
