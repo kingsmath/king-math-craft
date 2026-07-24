@@ -1,4 +1,4 @@
-// Player Physics & Traditional Minecraft Controls Engine
+// Player Physics & Traditional Minecraft Controls Engine (15x15 Parcels)
 class PlayerPhysics {
     constructor(world) {
         this.world = world;
@@ -15,7 +15,7 @@ class PlayerPhysics {
         // Assigned Player Parcel Number (1-32)
         this.playerNumber = 1;
 
-        // Key states
+        // Key states (Keyboard & Touch)
         this.keys = {
             forward: false,
             backward: false,
@@ -35,52 +35,62 @@ class PlayerPhysics {
     }
 
     getParcelNumber(x, z) {
-        if (-16 <= x && x <= 15 && -16 <= z && z <= 15) {
-            return 0; // Center Public Plaza
+        // Central Living Room Plaza (-60..59, -60..59)
+        if (-60 <= x && x <= 59 && -60 <= z && z <= 59) {
+            return 0;
         }
 
-        if (z <= -17) {
-            if (x < -24) return 1;
-            else if (x < -16) return 2;
-            else if (x < -8) return 3;
-            else if (x < 0) return 4;
-            else if (x < 8) return 5;
-            else if (x < 16) return 6;
-            else if (x < 24) return 7;
-            else return 8;
+        // 4 Corner Regions (Public Living Room)
+        if ((x < -60 && z < -60) or (x > 59 && z < -60) or (x > 59 && z > 59) or (x < -60 && z > 59)) {
+            return 0;
         }
 
-        if (x >= 16) {
-            if (z < -10) return 9;
-            else if (z < -4) return 10;
-            else if (z < 2) return 11;
-            else if (z < 8) return 12;
-            else if (z < 14) return 13;
-            else if (z < 20) return 14;
-            else if (z < 26) return 15;
-            else return 16;
+        // North Side (Z <= -61, 8 Parcels across X: -60 to 59, each 15 wide)
+        if (z <= -61) {
+            if (-60 <= x && x <= -46) return 1;
+            else if (-45 <= x && x <= -31) return 2;
+            else if (-30 <= x && x <= -16) return 3;
+            else if (-15 <= x && x <= -1) return 4;
+            else if (0 <= x && x <= 14) return 5;
+            else if (15 <= x && x <= 29) return 6;
+            else if (30 <= x && x <= 44) return 7;
+            else if (45 <= x && x <= 59) return 8;
         }
 
-        if (z >= 16) {
-            if (x >= 24) return 17;
-            else if (x >= 16) return 18;
-            else if (x >= 8) return 19;
-            else if (x >= 0) return 20;
-            else if (x >= -8) return 21;
-            else if (x >= -16) return 22;
-            else if (x >= -24) return 23;
-            else return 24;
+        // East Side (X >= 60, 8 Parcels down Z: -60 to 59, each 15 deep)
+        if (x >= 60) {
+            if (-60 <= z && z <= -46) return 9;
+            else if (-45 <= z && z <= -31) return 10;
+            else if (-30 <= z && z <= -16) return 11;
+            else if (-15 <= z && z <= -1) return 12;
+            else if (0 <= z && z <= 14) return 13;
+            else if (15 <= z && z <= 29) return 14;
+            else if (30 <= z && z <= 44) return 15;
+            else if (45 <= z && z <= 59) return 16;
         }
 
-        if (x <= -17) {
-            if (z >= 26) return 25;
-            else if (z >= 20) return 26;
-            else if (z >= 14) return 27;
-            else if (z >= 8) return 28;
-            else if (z >= 2) return 29;
-            else if (z >= -4) return 30;
-            else if (z >= -10) return 31;
-            else return 32;
+        // South Side (Z >= 60, 8 Parcels across X: 59 down to -60, each 15 wide)
+        if (z >= 60) {
+            if (45 <= x && x <= 59) return 17;
+            else if (30 <= x && x <= 44) return 18;
+            else if (15 <= x && x <= 29) return 19;
+            else if (0 <= x && x <= 14) return 20;
+            else if (-15 <= x && x <= -1) return 21;
+            else if (-30 <= x && x <= -16) return 22;
+            else if (-45 <= x && x <= -31) return 23;
+            else if (-60 <= x && x <= -46) return 24;
+        }
+
+        // West Side (X <= -61, 8 Parcels up Z: 59 down to -60, each 15 deep)
+        if (x <= -61) {
+            if (45 <= z && z <= 59) return 25;
+            else if (30 <= z && z <= 44) return 26;
+            else if (15 <= z && z <= 29) return 27;
+            else if (0 <= z && z <= 14) return 28;
+            else if (-15 <= z && z <= -1) return 29;
+            else if (-30 <= z && z <= -16) return 30;
+            else if (-45 <= z && z <= -31) return 31;
+            else if (-60 <= z && z <= -46) return 32;
         }
 
         return 0;
@@ -136,7 +146,7 @@ class PlayerPhysics {
             const sinYaw = Math.sin(this.rotation.y);
             const cosYaw = Math.cos(this.rotation.y);
 
-            // Exact FPS Directional Math (W moves towards look direction, D moves right)
+            // Exact FPS Directional Math
             const dx = forwardInput * (-sinYaw) + rightInput * cosYaw;
             const dz = forwardInput * (-cosYaw) + rightInput * (-sinYaw);
 

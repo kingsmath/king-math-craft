@@ -28,49 +28,59 @@ ROOMS_FILE = DATA_DIR / "rooms_meta.json"
 # In-memory room storage
 rooms = {}
 
+# 15x15 Parcel Math (-60 to 59 Central Plaza, Corner Living Rooms, 32 Border Parcels)
 def get_parcel_number(x, z):
-    if -16 <= x <= 15 and -16 <= z <= 15:
-        return 0  # Center Public Plaza
+    # Central Living Room Plaza (-60..59, -60..59)
+    if -60 <= x <= 59 and -60 <= z <= 59:
+        return 0
 
-    if z <= -17:
-        if x < -24: return 1
-        elif x < -16: return 2
-        elif x < -8: return 3
-        elif x < 0: return 4
-        elif x < 8: return 5
-        elif x < 16: return 6
-        elif x < 24: return 7
-        else: return 8
+    # 4 Corner Regions (Public Living Room)
+    if (x < -60 and z < -60) or (x > 59 and z < -60) or (x > 59 and z > 59) or (x < -60 and z > 59):
+        return 0
 
-    if x >= 16:
-        if z < -10: return 9
-        elif z < -4: return 10
-        elif z < 2: return 11
-        elif z < 8: return 12
-        elif z < 14: return 13
-        elif z < 20: return 14
-        elif z < 26: return 15
-        else: return 16
+    # North Side (Z <= -61, 8 Parcels across X: -60 to 59, each 15 wide)
+    if z <= -61:
+        if -60 <= x <= -46: return 1
+        elif -45 <= x <= -31: return 2
+        elif -30 <= x <= -16: return 3
+        elif -15 <= x <= -1: return 4
+        elif 0 <= x <= 14: return 5
+        elif 15 <= x <= 29: return 6
+        elif 30 <= x <= 44: return 7
+        elif 45 <= x <= 59: return 8
 
-    if z >= 16:
-        if x >= 24: return 17
-        elif x >= 16: return 18
-        elif x >= 8: return 19
-        elif x >= 0: return 20
-        elif x >= -8: return 21
-        elif x >= -16: return 22
-        elif x >= -24: return 23
-        else: return 24
+    # East Side (X >= 60, 8 Parcels down Z: -60 to 59, each 15 deep)
+    if x >= 60:
+        if -60 <= z <= -46: return 9
+        elif -45 <= z <= -31: return 10
+        elif -30 <= z <= -16: return 11
+        elif -15 <= z <= -1: return 12
+        elif 0 <= z <= 14: return 13
+        elif 15 <= z <= 29: return 14
+        elif 30 <= z <= 44: return 15
+        elif 45 <= z <= 59: return 16
 
-    if x <= -17:
-        if z >= 26: return 25
-        elif z >= 20: return 26
-        elif z >= 14: return 27
-        elif z >= 8: return 28
-        elif z >= 2: return 29
-        elif z >= -4: return 30
-        elif z >= -10: return 31
-        else: return 32
+    # South Side (Z >= 60, 8 Parcels across X: 59 down to -60, each 15 wide)
+    if z >= 60:
+        if 45 <= x <= 59: return 17
+        elif 30 <= x <= 44: return 18
+        elif 15 <= x <= 29: return 19
+        elif 0 <= x <= 14: return 20
+        elif -15 <= x <= -1: return 21
+        elif -30 <= x <= -16: return 22
+        elif -45 <= x <= -31: return 23
+        elif -60 <= x <= -46: return 24
+
+    # West Side (X <= -61, 8 Parcels up Z: 59 down to -60, each 15 deep)
+    if x <= -61:
+        if 45 <= z <= 59: return 25
+        elif 30 <= z <= 44: return 26
+        elif 15 <= z <= 29: return 27
+        elif 0 <= z <= 14: return 28
+        elif -15 <= z <= -1: return 29
+        elif -30 <= z <= -16: return 30
+        elif -45 <= z <= -31: return 31
+        elif -60 <= z <= -46: return 32
 
     return 0
 
@@ -464,7 +474,7 @@ if __name__ == "__main__":
     print(f"  [KING MATH CRAFT] Web Server Running!")
     print(f"  [URL] http://localhost:{PORT}")
     print(f"  [LIMIT] Max Players per Room: {MAX_PLAYERS_PER_ROOM}")
-    print(f"  [CLEANUP] Auto-Purge Inactive Rooms: 30 Days")
+    print(f"  [PARCELS] 32 Parcels (15x15 blocks each) + 4 Corner Living Rooms")
     print("=" * 60)
 
     app = create_app()

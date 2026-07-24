@@ -1,8 +1,8 @@
-// 3D Voxel Engine & World Generator for 킹수학크래프트 (Green Living Room Plaza & 32 Colored Parcels)
+// 3D Voxel Engine & World Generator for 킹수학크래프트 (15x15 Parcels, 4 Corner Living Rooms, Touch Controller)
 class VoxelWorld {
     constructor(scene) {
         this.scene = scene;
-        this.worldSize = 64; // 64x64 blocks (-32 to 31)
+        this.worldSize = 160; // 160x160 blocks (-80 to 79)
         this.blocks = new Map();
         
         this.chunkGroup = null;
@@ -164,52 +164,62 @@ class VoxelWorld {
     }
 
     getParcelNumber(x, z) {
-        if (-16 <= x && x <= 15 && -16 <= z && z <= 15) {
-            return 0; // Center Public Plaza
+        // Central Living Room Plaza (-60..59, -60..59)
+        if (-60 <= x && x <= 59 && -60 <= z && z <= 59) {
+            return 0;
         }
 
-        if (z <= -17) {
-            if (x < -24) return 1;
-            else if (x < -16) return 2;
-            else if (x < -8) return 3;
-            else if (x < 0) return 4;
-            else if (x < 8) return 5;
-            else if (x < 16) return 6;
-            else if (x < 24) return 7;
-            else return 8;
+        // 4 Corner Regions (Public Living Room)
+        if ((x < -60 && z < -60) || (x > 59 && z < -60) || (x > 59 && z > 59) || (x < -60 && z > 59)) {
+            return 0;
         }
 
-        if (x >= 16) {
-            if (z < -10) return 9;
-            else if (z < -4) return 10;
-            else if (z < 2) return 11;
-            else if (z < 8) return 12;
-            else if (z < 14) return 13;
-            else if (z < 20) return 14;
-            else if (z < 26) return 15;
-            else return 16;
+        // North Side (Z <= -61, 8 Parcels across X: -60 to 59, each 15 wide)
+        if (z <= -61) {
+            if (-60 <= x && x <= -46) return 1;
+            else if (-45 <= x && x <= -31) return 2;
+            else if (-30 <= x && x <= -16) return 3;
+            else if (-15 <= x && x <= -1) return 4;
+            else if (0 <= x && x <= 14) return 5;
+            else if (15 <= x && x <= 29) return 6;
+            else if (30 <= x && x <= 44) return 7;
+            else if (45 <= x && x <= 59) return 8;
         }
 
-        if (z >= 16) {
-            if (x >= 24) return 17;
-            else if (x >= 16) return 18;
-            else if (x >= 8) return 19;
-            else if (x >= 0) return 20;
-            else if (x >= -8) return 21;
-            else if (x >= -16) return 22;
-            else if (x >= -24) return 23;
-            else return 24;
+        // East Side (X >= 60, 8 Parcels down Z: -60 to 59, each 15 deep)
+        if (x >= 60) {
+            if (-60 <= z && z <= -46) return 9;
+            else if (-45 <= z && z <= -31) return 10;
+            else if (-30 <= z && z <= -16) return 11;
+            else if (-15 <= z && z <= -1) return 12;
+            else if (0 <= z && z <= 14) return 13;
+            else if (15 <= z && z <= 29) return 14;
+            else if (30 <= z && z <= 44) return 15;
+            else if (45 <= z && z <= 59) return 16;
         }
 
-        if (x <= -17) {
-            if (z >= 26) return 25;
-            else if (z >= 20) return 26;
-            else if (z >= 14) return 27;
-            else if (z >= 8) return 28;
-            else if (z >= 2) return 29;
-            else if (z >= -4) return 30;
-            else if (z >= -10) return 31;
-            else return 32;
+        // South Side (Z >= 60, 8 Parcels across X: 59 down to -60, each 15 wide)
+        if (z >= 60) {
+            if (45 <= x && x <= 59) return 17;
+            else if (30 <= x && x <= 44) return 18;
+            else if (15 <= x && x <= 29) return 19;
+            else if (0 <= x && x <= 14) return 20;
+            else if (-15 <= x && x <= -1) return 21;
+            else if (-30 <= x && x <= -16) return 22;
+            else if (-45 <= x && x <= -31) return 23;
+            else if (-60 <= x && x <= -46) return 24;
+        }
+
+        // West Side (X <= -61, 8 Parcels up Z: 59 down to -60, each 15 deep)
+        if (x <= -61) {
+            if (45 <= z && z <= 59) return 25;
+            else if (30 <= z && z <= 44) return 26;
+            else if (15 <= z && z <= 29) return 27;
+            else if (0 <= z && z <= 14) return 28;
+            else if (-15 <= z && z <= -1) return 29;
+            else if (-30 <= z && z <= -16) return 30;
+            else if (-45 <= z && z <= -31) return 31;
+            else if (-60 <= z && z <= -46) return 32;
         }
 
         return 0;
@@ -217,7 +227,7 @@ class VoxelWorld {
 
     // Completely Flat World Generation (Y = 4 Flat Everywhere, Green Living Room)
     generateWorld() {
-        const half = this.worldSize / 2;
+        const half = 80;
         const groundHeight = 4;
 
         for (let x = -half; x < half; x++) {
@@ -240,9 +250,11 @@ class VoxelWorld {
                     }
                 }
 
-                // Glowing Border Glowstones at Center Plaza Perimeter
-                if ((x === -16 || x === 15 || z === -16 || z === 15) && parcel !== 0) {
-                    this.blocks.set(this.getKey(x, groundHeight, z), 8);
+                // Glowing Border Glowstones at Center Plaza Perimeter (-60, 59)
+                if (((x === -60 || x === 59) && (z >= -60 && z <= 59)) || ((z === -60 || z === 59) && (x >= -60 && x <= 59))) {
+                    if (parcel !== 0) {
+                        this.blocks.set(this.getKey(x, groundHeight, z), 8);
+                    }
                 }
             }
         }
@@ -252,18 +264,23 @@ class VoxelWorld {
     }
 
     createParcelSignposts(groundHeight) {
+        // Signposts placed right at entrance facing the Central Living Room!
         const signPositions = [
-            { num: 1, x: -28, z: -17 }, { num: 2, x: -20, z: -17 }, { num: 3, x: -12, z: -17 }, { num: 4, x: -4, z: -17 },
-            { num: 5, x: 4, z: -17 },   { num: 6, x: 12, z: -17 },  { num: 7, x: 20, z: -17 },  { num: 8, x: 28, z: -17 },
+            // North Side (Facing South)
+            { num: 1, x: -53, z: -60 }, { num: 2, x: -38, z: -60 }, { num: 3, x: -23, z: -60 }, { num: 4, x: -8, z: -60 },
+            { num: 5, x: 7, z: -60 },   { num: 6, x: 22, z: -60 },  { num: 7, x: 37, z: -60 },  { num: 8, x: 52, z: -60 },
             
-            { num: 9, x: 16, z: -13 },  { num: 10, x: 16, z: -7 },  { num: 11, x: 16, z: -1 },  { num: 12, x: 16, z: 5 },
-            { num: 13, x: 16, z: 11 },  { num: 14, x: 16, z: 17 },  { num: 15, x: 16, z: 23 },  { num: 16, x: 16, z: 29 },
+            // East Side (Facing West)
+            { num: 9, x: 59, z: -53 },  { num: 10, x: 59, z: -38 }, { num: 11, x: 59, z: -23 }, { num: 12, x: 59, z: -8 },
+            { num: 13, x: 59, z: 7 },   { num: 14, x: 59, z: 22 },  { num: 15, x: 59, z: 37 },  { num: 16, x: 59, z: 52 },
 
-            { num: 17, x: 28, z: 16 },  { num: 18, x: 20, z: 16 },  { num: 19, x: 12, z: 16 },  { num: 20, x: 4, z: 16 },
-            { num: 21, x: -4, z: 16 },  { num: 22, x: -12, z: 16 }, { num: 23, x: -20, z: 16 }, { num: 24, x: -28, z: 16 },
+            // South Side (Facing North)
+            { num: 17, x: 52, z: 59 },  { num: 18, x: 37, z: 59 },  { num: 19, x: 22, z: 59 },  { num: 20, x: 7, z: 59 },
+            { num: 21, x: -8, z: 59 },  { num: 22, x: -23, z: 59 }, { num: 23, x: -38, z: 59 }, { num: 24, x: -53, z: 59 },
 
-            { num: 25, x: -17, z: 29 }, { num: 26, x: -17, z: 23 }, { num: 27, x: -17, z: 17 }, { num: 28, x: -17, z: 11 },
-            { num: 29, x: -17, z: 5 },  { num: 30, x: -17, z: -1 }, { num: 31, x: -17, z: -7 }, { num: 32, x: -17, z: -13 }
+            // West Side (Facing East)
+            { num: 25, x: -60, z: 52 }, { num: 26, x: -60, z: 37 }, { num: 27, x: -60, z: 22 }, { num: 28, x: -60, z: 7 },
+            { num: 29, x: -60, z: -8 }, { num: 30, x: -60, z: -23 },{ num: 31, x: -60, z: -38 },{ num: 32, x: -60, z: -53 }
         ];
 
         this.signGroup = new THREE.Group();
@@ -292,7 +309,7 @@ class VoxelWorld {
 
             const texture = new THREE.CanvasTexture(canvas);
             const signMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
-            const signGeo = new THREE.PlaneGeometry(1.2, 0.6);
+            const signGeo = new THREE.PlaneGeometry(1.4, 0.7);
             const signMesh = new THREE.Mesh(signGeo, signMat);
             signMesh.position.set(p.x + 0.5, groundHeight + 2.1, p.z + 0.5);
 
@@ -359,6 +376,10 @@ class MinecraftGame {
         this.selectedSlot = 1;
         this.cameraMode = 0; // 0: First-Person, 1: Third-Person Back, 2: Third-Person Front
 
+        // Touch Drag Camera Vars
+        this.touchPreviousX = 0;
+        this.touchPreviousY = 0;
+
         // Modules
         this.world = new VoxelWorld(this.scene);
         this.physics = new PlayerPhysics(this.world);
@@ -373,6 +394,7 @@ class MinecraftGame {
         this.initLighting();
         this.initNumberGridSelector();
         this.initEventListeners();
+        this.initTouchControls();
     }
 
     initLighting() {
@@ -408,6 +430,110 @@ class MinecraftGame {
 
             grid.appendChild(btn);
         }
+    }
+
+    initTouchControls() {
+        const bindButton = (id, keyName) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+
+            const press = (e) => {
+                e.preventDefault();
+                this.physics.keys[keyName] = true;
+                btn.classList.add('active');
+            };
+
+            const release = (e) => {
+                e.preventDefault();
+                this.physics.keys[keyName] = false;
+                btn.classList.remove('active');
+            };
+
+            btn.addEventListener('touchstart', press);
+            btn.addEventListener('touchend', release);
+            btn.addEventListener('mousedown', press);
+            btn.addEventListener('mouseup', release);
+            btn.addEventListener('mouseleave', release);
+        };
+
+        bindButton('btn-touch-up', 'forward');
+        bindButton('btn-touch-down', 'backward');
+        bindButton('btn-touch-left', 'left');
+        bindButton('btn-touch-right', 'right');
+        bindButton('btn-touch-jump', 'jump');
+
+        // Sprint Toggle Button
+        const sprintBtn = document.getElementById('btn-touch-sprint');
+        if (sprintBtn) {
+            sprintBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.physics.keys.sprint = !this.physics.keys.sprint;
+                sprintBtn.classList.toggle('active', this.physics.keys.sprint);
+            });
+        }
+
+        // Break Block Button
+        const breakBtn = document.getElementById('btn-touch-break');
+        if (breakBtn) {
+            breakBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = this.physics.raycastTarget(6.0);
+                if (target.hit) {
+                    const { x, y, z } = target.targetBlock;
+                    this.net.sendBlockChange(x, y, z, 0);
+                }
+            });
+        }
+
+        // Place Block Button
+        const placeBtn = document.getElementById('btn-touch-place');
+        if (placeBtn) {
+            placeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = this.physics.raycastTarget(6.0);
+                if (target.hit) {
+                    const { x, y, z } = target.placeBlock;
+                    this.net.sendBlockChange(x, y, z, this.selectedSlot);
+                }
+            });
+        }
+
+        // Camera Switch Button
+        const camBtn = document.getElementById('btn-touch-cam');
+        if (camBtn) {
+            camBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.cameraMode = (this.cameraMode + 1) % 3;
+            });
+        }
+
+        // Touch Drag for Camera Rotation on Canvas
+        this.canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                this.touchPreviousX = e.touches[0].clientX;
+                this.touchPreviousY = e.touches[0].clientY;
+            }
+        });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                const touchX = e.touches[0].clientX;
+                const touchY = e.touches[0].clientY;
+
+                const deltaX = touchX - this.touchPreviousX;
+                const deltaY = touchY - this.touchPreviousY;
+
+                const sensitivity = 0.004;
+                this.physics.rotation.y -= deltaX * sensitivity;
+                this.physics.rotation.x -= deltaY * sensitivity;
+
+                const maxPitch = Math.PI / 2 - 0.05;
+                this.physics.rotation.x = Math.max(-maxPitch, Math.min(maxPitch, this.physics.rotation.x));
+
+                this.touchPreviousX = touchX;
+                this.touchPreviousY = touchY;
+            }
+        });
     }
 
     initEventListeners() {

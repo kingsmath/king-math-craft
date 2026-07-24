@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>👑 킹수학크래프트 - 3D 멀티플레이어</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,12 +54,11 @@
 
         <!-- Controls Info (Top Left - Traditional Minecraft Controls) -->
         <div id="controls-info" class="glass-panel">
-            <div class="panel-title">🎮 마인크래프트 전통 조작법</div>
+            <div class="panel-title">🎮 마인크래프트 조작법 (15x15 개인땅)</div>
             <ul>
-                <li><span class="key">WASD</span> 이동 (Ctrl 달리기)</li>
+                <li><span class="key">WASD</span> / <span class="key">터치버튼</span> 이동</li>
                 <li><span class="key">Space</span> 점프 / <span class="key">Shift</span> 숙이기</li>
-                <li><span class="key">좌클릭</span> 블록 파괴 (부수기)</li>
-                <li><span class="key">우클릭</span> 블록 설치 (놓기)</li>
+                <li><span class="key">좌클릭</span> 파괴 / <span class="key">우클릭</span> 설치</li>
                 <li><span class="key">1~9</span> / <span class="key">휠</span> 핫바 9슬롯 선택</li>
                 <li><span class="key">F5</span> 시점 변경 (1인칭/3인칭)</li>
                 <li><span class="key">T</span> / <span class="key">Enter</span> 채팅창 열기</li>
@@ -91,6 +90,26 @@
             <div class="hotbar-slot" data-slot="9"><span class="slot-num">9</span><div class="icon diamond"></div><span class="slot-name">다이아</span></div>
         </div>
 
+        <!-- Mobile & Tablet Touch Controls Overlay -->
+        <div id="touch-controls">
+            <div id="touch-dpad">
+                <button id="btn-touch-up" class="touch-btn">▲</button>
+                <div class="touch-row">
+                    <button id="btn-touch-left" class="touch-btn">◀</button>
+                    <button id="btn-touch-sprint" class="touch-btn btn-sprint">🏃</button>
+                    <button id="btn-touch-right" class="touch-btn">▶</button>
+                </div>
+                <button id="btn-touch-down" class="touch-btn">▼</button>
+            </div>
+
+            <div id="touch-actions">
+                <button id="btn-touch-break" class="touch-btn action-btn btn-break">🔨 파괴</button>
+                <button id="btn-touch-place" class="touch-btn action-btn btn-place">🧱 설치</button>
+                <button id="btn-touch-jump" class="touch-btn action-btn btn-jump">⬆️ 점프</button>
+                <button id="btn-touch-cam" class="touch-btn action-btn btn-cam">👁️ 시점</button>
+            </div>
+        </div>
+
         <!-- Floating Nickname Tags Container -->
         <div id="nametags-container"></div>
     </div>
@@ -101,7 +120,7 @@
             <div class="logo-area">
                 <div class="crown-logo">👑</div>
                 <h1>킹수학크래프트</h1>
-                <p class="subtitle">3D 실시간 동시접속 (중앙 녹색 거실 + 32개 개인땅)</p>
+                <p class="subtitle">3D 실시간 동시접속 (15x15 대형 개인땅 + 모바일지원)</p>
             </div>
 
             <!-- First-Come First-Served & 30-Day Alert Box -->
@@ -126,7 +145,7 @@
 
                 <!-- 1~32 Player Number Grid Selector -->
                 <div class="number-selector-section">
-                    <label class="section-label">몇 번인가요? (개인 땅 1번~32번 선택)</label>
+                    <label class="section-label">몇 번인가요? (가로15x세로15 개인 땅 선택)</label>
                     <div id="number-grid" class="number-grid"></div>
                     <input type="hidden" id="selected-number" value="1">
                 </div>
@@ -146,7 +165,7 @@
 
             <div class="server-info-badge">
                 <span class="pulse-dot"></span>
-                <span>방당 인원: <strong>최대 30명</strong> | 중앙 녹색 거실 + 32개 개인 땅</span>
+                <span>방당 인원: <strong>최대 30명</strong> | 중앙 거실 + 32개 15x15 개인 땅</span>
             </div>
         </div>
     </div>
