@@ -1,3 +1,9 @@
+// Non-solid block types: air(0), water(20), sapling(27), flower(32) - pass-through for movement
+const NON_SOLID_TYPES = new Set([0, 20, 27, 32]);
+function isSolidBlockType(type) {
+    return !NON_SOLID_TYPES.has(type);
+}
+
 // Player Physics & Natural Movement Engine (15x15 Parcels, Unbreakable Base, Smooth Lerp Inertia & Head Bobbing)
 class PlayerPhysics {
     constructor(world) {
@@ -36,6 +42,10 @@ class PlayerPhysics {
         // Natural Head Bobbing Timer
         this.bobTimer = 0;
         this.currentBobOffset = 0;
+
+        // Swimming State (water = block type 20)
+        this.inWater = false;
+        this.WATER_BLOCK = 20;
     }
 
     getParcelNumber(x, z) {
@@ -125,9 +135,16 @@ class PlayerPhysics {
     update(delta) {
         if (delta > 0.1) delta = 0.1;
 
-        // Speed Modifiers (Sprint / Sneak)
+        // Swimming detection (feet/body submerged in water block = 20)
+        const feetBlock = this.world.getBlock(Math.floor(this.position.x), Math.floor(this.position.y), Math.floor(this.position.z));
+        const chestBlock = this.world.getBlock(Math.floor(this.position.x), Math.floor(this.position.y + 1.0), Math.floor(this.position.z));
+        this.inWater = (feetBlock === this.WATER_BLOCK || chestBlock === this.WATER_BLOCK);
+
+        // Speed Modifiers (Sprint / Sneak / Swim)
         let currentSpeed = this.walkSpeed;
-        if (this.keys.sprint && !this.keys.sneak) {
+        if (this.inWater) {
+            currentSpeed = this.walkSpeed * 0.55;
+        } else if (this.keys.sprint && !this.keys.sneak) {
             currentSpeed = this.sprintSpeed;
         } else if (this.keys.sneak) {
             currentSpeed = this.sneakSpeed;
@@ -178,15 +195,22 @@ class PlayerPhysics {
         this.velocity.x += (targetVx - this.velocity.x) * Math.min(1.0, delta * lerpRate);
         this.velocity.z += (targetVz - this.velocity.z) * Math.min(1.0, delta * lerpRate);
 
-        // Traditional Jump
-        if (this.keys.jump && this.onGround) {
+        // Traditional Jump (or Swim-Up while in water)
+        if (this.keys.jump && this.onGround && !this.inWater) {
             this.velocity.y = this.jumpForce;
             this.onGround = false;
             if (typeof sfx !== 'undefined') sfx.playJump();
+        } else if (this.keys.jump && this.inWater) {
+            this.velocity.y = Math.min(this.velocity.y + this.gravity * delta * 2.2, 3.2);
         }
 
-        // Gravity
-        this.velocity.y -= this.gravity * delta;
+        // Gravity (buoyant/slowed while swimming)
+        if (this.inWater) {
+            this.velocity.y -= this.gravity * 0.18 * delta;
+            this.velocity.y = Math.max(this.velocity.y, -2.2);
+        } else {
+            this.velocity.y -= this.gravity * delta;
+        }
 
         // Axis-by-Axis Movement & AABB Collisions
         this.moveAxis(this.velocity.x * delta, 0, 0);
@@ -228,7 +252,7 @@ class PlayerPhysics {
             for (let y = minY; y <= maxY; y++) {
                 for (let z = minZ; z <= maxZ; z++) {
                     const block = this.world.getBlock(x, y, z);
-                    if (block !== 0) {
+                    if (isSolidBlockType(block)) {
                         if (dx > 0) this.position.x = x - halfW - 0.001;
                         if (dx < 0) this.position.x = x + 1 + halfW + 0.001;
 

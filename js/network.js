@@ -7,8 +7,8 @@ class NetworkManager {
         this.username = '';
         this.parcelNumber = 1;
         this.myId = null;
-        
-        // Available Vibrant Shirt Colors for Random Avatar Clothes
+
+        // Available Vibrant Shirt Colors for Random Avatar Clothes (fallback only)
         this.shirtColors = [
             0xef4444, 0xf97316, 0xf59e0b, 0x84cc16, 0x10b981, 0x06b6d4,
             0x3b82f6, 0x6366f1, 0x8b5cf6, 0xd946ef, 0xec4899, 0x14b8a6,
@@ -16,11 +16,16 @@ class NetworkManager {
         ];
     }
 
+    isExternalStaticHost() {
+        const host = window.location.host;
+        return host.includes('pages.dev') || host.includes('github.io') || host.includes('netlify.app') || host.includes('vercel.app');
+    }
+
     getServerUrl() {
         const host = window.location.host;
 
         // If hosted on Cloudflare Pages (.pages.dev), GitHub Pages (.github.io), Netlify, or Vercel, connect to Render Python Backend!
-        if (host.includes('pages.dev') || host.includes('github.io') || host.includes('netlify.app') || host.includes('vercel.app')) {
+        if (this.isExternalStaticHost()) {
             return 'wss://king-math-craft.onrender.com/ws';
         }
 
@@ -31,6 +36,27 @@ class NetworkManager {
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         return `${protocol}//${host}/ws`;
+    }
+
+    getHttpBaseUrl() {
+        const host = window.location.host;
+
+        if (this.isExternalStaticHost()) {
+            return 'https://king-math-craft.onrender.com';
+        }
+        if (!host || host.includes('localhost') || host.includes('127.0.0.1')) {
+            const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+            return `${protocol}//${host || 'localhost:8000'}`;
+        }
+        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        return `${protocol}//${host}`;
+    }
+
+    async checkRoomId(roomId) {
+        const url = `${this.getHttpBaseUrl()}/api/check-room?id=${encodeURIComponent(roomId)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('check-room request failed');
+        return res.json();
     }
 
     connect(username, password, parcelPin, playerNum) {
@@ -146,6 +172,16 @@ class NetworkManager {
                     countBadge.innerText = `${total} / 32`;
                 }
 
+                // Survival systems init: day/night clock, mobs, inventory, appearance, HP
+                if (this.game.dayNight) this.game.dayNight.init(data.world_start_time, data.day_phase);
+                if (this.game.entities && data.mobs) this.game.entities.updateFromList(data.mobs);
+                if (this.game.inventory) {
+                    this.game.inventory.applyServerInventory(data.inventory);
+                    this.game.inventory.applyServerHp(data.hp, data.maxHp);
+                }
+                this.myAppearance = data.appearance || this.myAppearance;
+                this.game.onLoginAppearance(data.appearance);
+
                 // If host map load prompt required
                 if (data.prompt_host_load) {
                     this.game.showHostLoadModal();
@@ -203,7 +239,73 @@ class NetworkManager {
             case 'chat_msg':
                 this.game.addChatMessage(data.sender, data.text);
                 break;
+
+            case 'day_phase_changed':
+                if (this.game.dayNight) this.game.dayNight.onServerPhaseChanged(data.phase, data.world_start_time);
+                break;
+
+            case 'entity_update':
+                if (this.game.entities) this.game.entities.updateFromList(data.mobs);
+                break;
+
+            case 'entity_removed':
+                if (this.game.entities) this.game.entities.removeMany(data.ids, data.reason);
+                break;
+
+            case 'world_edits_batch':
+                if (data.edits) {
+                    Object.entries(data.edits).forEach(([key, blockType]) => {
+                        const [x, y, z] = key.split(',').map(Number);
+                        this.game.world.setBlock(x, y, z, blockType, false);
+                    });
+                    this.game.world.rebuildAllChunks();
+                }
+                break;
+
+            case 'player_hp':
+                if (this.game.inventory) this.game.inventory.applyServerHp(data.hp, data.maxHp);
+                break;
+
+            case 'player_died':
+                if (this.game.inventory) this.game.inventory.onPlayerDied(data.respawn);
+                break;
+
+            case 'attack_result':
+                if (!data.hit && data.reason) this.game.showToast(`⚔️ ${data.reason}`);
+                break;
+
+            case 'inventory_sync':
+                if (this.game.inventory) this.game.inventory.applyServerInventory(data.inventory);
+                break;
+
+            case 'appearance_changed':
+                this.updateRemotePlayerAppearance(data.id, data.appearance);
+                break;
         }
+    }
+
+    // Nearest remote player hit by the crosshair ray, used for PVP melee targeting
+    raycastNearestPlayer(eye, dir, maxDist) {
+        const targets = [];
+        this.remotePlayers.forEach((rp, id) => {
+            targets.push({ id, x: rp.group.position.x, y: rp.group.position.y + 0.9, z: rp.group.position.z });
+        });
+        const hit = raySphereHitTest(eye, dir, targets, maxDist, 0.6);
+        return hit ? hit.id : null;
+    }
+
+    updateRemotePlayerAppearance(id, appearance) {
+        const rp = this.remotePlayers.get(id);
+        if (!rp || !appearance) return;
+        this.applyAppearanceToMesh(rp.group, appearance);
+    }
+
+    applyAppearanceToMesh(group, appearance) {
+        if (!appearance || !group.userData) return;
+        if (group.userData.head) group.userData.head.material.color.set(appearance.skin || '#ffdbac');
+        if (group.userData.body) group.userData.body.material.color.set(appearance.shirt || '#3b82f6');
+        (group.userData.legs || []).forEach((leg) => leg.material.color.set(appearance.pants || '#1e3a8a'));
+        (group.userData.arms || []).forEach((arm) => arm.material.color.set(appearance.skin || '#ffdbac'));
     }
 
     sendBlockChange(x, y, z, blockType) {
@@ -251,6 +353,11 @@ class NetworkManager {
         });
     }
 
+    sendAppearanceUpdate(appearance) {
+        this.myAppearance = appearance;
+        this.send({ type: 'appearance_update', appearance });
+    }
+
     sendPosition() {
         if (!this.myId) return;
         const pos = this.game.physics.position;
@@ -271,7 +378,7 @@ class NetworkManager {
         if (id === this.myId) return;
 
         if (!this.remotePlayers.has(id)) {
-            const meshGroup = this.createPlayerMesh(pData.player_number || 1, id);
+            const meshGroup = this.createPlayerMesh(pData.player_number || 1, id, pData.appearance);
             meshGroup.position.set(pData.x || 0, pData.y || 5.0, pData.z || 0);
             this.game.scene.add(meshGroup);
             this.remotePlayers.set(id, {
@@ -283,26 +390,36 @@ class NetworkManager {
             const rp = this.remotePlayers.get(id);
             if (pData.x !== undefined) rp.targetPos.set(pData.x, pData.y, pData.z);
             if (pData.rotY !== undefined) rp.targetRotY = pData.rotY;
+            if (pData.appearance) this.applyAppearanceToMesh(rp.group, pData.appearance);
         }
     }
 
-    // Create 3D Minecraft Humanoid Character with Random Clothes Color
-    createPlayerMesh(parcelNum, id) {
+    // Create 3D Minecraft Humanoid Character, colored per the player's chosen appearance
+    createPlayerMesh(parcelNum, id, appearance) {
         const group = new THREE.Group();
 
-        // Pick Random Shirt Color for Clothes based on Player ID / Parcel Number
         const colorIndex = (typeof id === 'string' ? id.charCodeAt(id.length - 1) : parcelNum) % this.shirtColors.length;
-        const shirtColor = this.shirtColors[colorIndex];
-        const pantsColor = 0x1e3a8a; // Dark Blue Jeans
+        const skinColor = (appearance && appearance.skin) || '#ffdbac';
+        const shirtColor = (appearance && appearance.shirt) || this.shirtColors[colorIndex];
+        const pantsColor = (appearance && appearance.pants) || 0x1e3a8a;
 
         // Head
         const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-        const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+        const headMat = new THREE.MeshStandardMaterial({ color: skinColor });
         const head = new THREE.Mesh(headGeo, headMat);
         head.position.y = 1.5;
         group.add(head);
 
-        // Body (Shirt with Random Color!)
+        // Arms (skin-colored, like the head)
+        const armGeo = new THREE.BoxGeometry(0.2, 0.65, 0.2);
+        const armMat = new THREE.MeshStandardMaterial({ color: skinColor });
+        const leftArm = new THREE.Mesh(armGeo, armMat);
+        leftArm.position.set(-0.35, 0.92, 0);
+        const rightArm = new THREE.Mesh(armGeo, armMat);
+        rightArm.position.set(0.35, 0.92, 0);
+        group.add(leftArm, rightArm);
+
+        // Body (Shirt)
         const bodyGeo = new THREE.BoxGeometry(0.5, 0.7, 0.3);
         const bodyMat = new THREE.MeshStandardMaterial({ color: shirtColor });
         const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -318,6 +435,17 @@ class NetworkManager {
         rightLeg.position.set(0.13, 0.325, 0);
         group.add(leftLeg);
         group.add(rightLeg);
+
+        group.userData = { head, body, legs: [leftLeg, rightLeg], arms: [leftArm, rightArm] };
+
+        if (appearance && appearance.hat === 'crown') {
+            const crownGeo = new THREE.ConeGeometry(0.28, 0.3, 4);
+            const crownMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.3 });
+            const crown = new THREE.Mesh(crownGeo, crownMat);
+            crown.position.y = 1.9;
+            crown.rotation.y = Math.PI / 4;
+            group.add(crown);
+        }
 
         // 3D Nickname Tag above head
         const canvas = document.createElement('canvas');
