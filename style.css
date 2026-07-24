@@ -99,28 +99,28 @@ body, html {
 /* Top Bar & Header Buttons */
 #top-bar {
     position: absolute;
-    top: 16px;
-    left: 16px;
-    right: 16px;
+    top: 4px;
+    left: 4px;
+    right: 4px;
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
+    gap: 4px;
 }
 
 .top-left-group, .top-right-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 3px;
 }
 
 #room-badge {
-    padding: 10px 18px;
+    padding: 4px 8px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 15px;
+    gap: 4px;
+    font-size: 13px;
     font-weight: 700;
 }
 
@@ -135,19 +135,19 @@ body, html {
 /* Top Header Buttons */
 .btn-group-top {
     display: flex;
-    gap: 10px;
+    gap: 3px;
 }
 
 .btn-icon {
-    width: 42px;
-    height: 42px;
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: 1px solid rgba(255, 255, 255, 0.2);
     background: rgba(59, 130, 246, 0.4);
     color: #fff;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -160,16 +160,16 @@ body, html {
 }
 
 .btn-invite {
-    height: 42px;
-    padding: 0 14px;
+    height: 34px;
+    padding: 0 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     border: 1px solid rgba(245, 158, 11, 0.4);
     background: rgba(245, 158, 11, 0.3);
     color: #fff;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 800;
     cursor: pointer;
     white-space: nowrap;
@@ -335,21 +335,21 @@ body, html {
 /* Traditional 9-Slot Hotbar */
 #hotbar {
     position: absolute;
-    bottom: 20px;
+    bottom: 4px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 6px;
-    padding: 8px;
+    gap: 2px;
+    padding: 2px;
     background: rgba(15, 23, 42, 0.85);
 }
 
 .hotbar-slot {
-    width: 52px;
-    height: 52px;
+    width: 44px;
+    height: 44px;
     background: rgba(255, 255, 255, 0.05);
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -459,17 +459,17 @@ body, html {
 
 #touch-actions {
     position: absolute;
-    bottom: 100px; /* cleared above the center-bottom hotbar so they never overlap */
-    right: 20px;
+    bottom: 52px; /* cleared above the center-bottom compact hotbar */
+    right: 4px;
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    gap: 4px;
     z-index: 15;
 }
 
 .touch-btn {
-    width: 58px;
-    height: 58px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     font-weight: 800;
     font-size: 22px;
@@ -833,11 +833,11 @@ body, html {
 /* HP / Hunger Status Bars */
 #status-bars {
     position: absolute;
-    bottom: 88px;
+    bottom: 52px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 16px;
+    gap: 6px;
     z-index: 12;
 }
 
