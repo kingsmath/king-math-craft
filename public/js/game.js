@@ -804,7 +804,7 @@ class MinecraftGame {
         if (!input || !statusEl) return;
 
         let debounceTimer = null;
-        input.addEventListener('input', () => {
+        const performCheck = () => {
             const val = input.value.trim();
             clearTimeout(debounceTimer);
 
@@ -815,33 +815,39 @@ class MinecraftGame {
                 return;
             }
             if (val.length < 4) {
-                statusEl.textContent = '⚠️ 4글자 이상 입력해주세요';
+                statusEl.textContent = '⚠️ 방 아이디는 4글자 이상 입력해주세요';
                 statusEl.className = 'room-id-status warn';
                 this.applyNumberRegistrationColors(null);
                 return;
             }
 
-            statusEl.textContent = '🔍 확인 중...';
+            statusEl.textContent = '🔍 방 상태 확인 중...';
             statusEl.className = 'room-id-status checking';
 
             debounceTimer = setTimeout(async () => {
                 try {
                     const result = await this.net.checkRoomId(val);
                     if (input.value.trim() !== val) return; // stale response, input changed since
-                    if (result.exists) {
-                        statusEl.textContent = 'ℹ️ 이미 있는 방이에요 (비밀번호 필요)';
+                    if (result && result.exists) {
+                        statusEl.textContent = '🔑 기존 방 존재! (설정된 방 비밀번호로 입장합니다)';
                         statusEl.className = 'room-id-status info';
                     } else {
-                        statusEl.textContent = '✅ 사용 가능한 이름이에요!';
+                        statusEl.textContent = '✨ 새 방 생성 가능! (입력하는 비밀번호로 새 방이 바로 생성됩니다)';
                         statusEl.className = 'room-id-status ok';
                     }
-                    this.applyNumberRegistrationColors(result.registered_numbers || []);
+                    this.applyNumberRegistrationColors(result ? result.registered_numbers || [] : []);
                 } catch (e) {
-                    statusEl.textContent = '';
-                    statusEl.className = 'room-id-status';
+                    statusEl.textContent = '✨ 새 방 생성 또는 기존 방 접속 (입력 후 게임 시작)';
+                    statusEl.className = 'room-id-status ok';
                 }
-            }, 450);
-        });
+            }, 300);
+        };
+
+        input.addEventListener('input', performCheck);
+        input.addEventListener('focus', performCheck);
+        if (input.value.trim().length >= 4) {
+            performCheck();
+        }
     }
 
     // If arriving via an invite link (?room=...&pw=...), pre-fill the room id/password so the
