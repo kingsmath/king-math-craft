@@ -412,8 +412,17 @@ class MinecraftGame {
 
     initNumberGridSelector() {
         const grid = document.getElementById('number-grid');
-        if (!grid) return;
+        const hiddenInput = document.getElementById('selected-number');
+        if (!grid || !hiddenInput) return;
+
         grid.innerHTML = '';
+
+        const selectNumber = (num, btnElement) => {
+            document.querySelectorAll('.num-btn').forEach(b => b.classList.remove('selected'));
+            if (btnElement) btnElement.classList.add('selected');
+            hiddenInput.value = String(num);
+            console.log(`[UI] Selected Parcel Number: ${num}`);
+        };
 
         for (let i = 1; i <= 32; i++) {
             const btn = document.createElement('button');
@@ -422,11 +431,14 @@ class MinecraftGame {
             btn.innerText = `${i}번`;
             btn.dataset.num = i;
 
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.num-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-                document.getElementById('selected-number').value = i;
-            });
+            const handleSelect = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                selectNumber(i, btn);
+            };
+
+            btn.addEventListener('click', handleSelect);
+            btn.addEventListener('touchstart', handleSelect, { passive: false });
 
             grid.appendChild(btn);
         }

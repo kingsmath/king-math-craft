@@ -116,7 +116,7 @@ class VoxelWorld {
             '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6',
             '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
             '#f43f5e', '#fb7185', '#38bdf8', '#818cf8', '#c084fc', '#f472b6', '#fb923c', '#facc15',
-            '#4ade80', '#2dd4bf', '#60a5fa', '#a78bfa', '#e879f9', '#f472b6', '#fb7185', '#38bdf8'
+            '#4ade80', '#2dd4bf', '#60a5fa', '#a78bfa', '#e879f9', '#f472b6', '#fb923c', '#38bdf8'
         ];
 
         for (let i = 1; i <= 32; i++) {
@@ -412,8 +412,17 @@ class MinecraftGame {
 
     initNumberGridSelector() {
         const grid = document.getElementById('number-grid');
-        if (!grid) return;
+        const hiddenInput = document.getElementById('selected-number');
+        if (!grid || !hiddenInput) return;
+
         grid.innerHTML = '';
+
+        const selectNumber = (num, btnElement) => {
+            document.querySelectorAll('.num-btn').forEach(b => b.classList.remove('selected'));
+            if (btnElement) btnElement.classList.add('selected');
+            hiddenInput.value = String(num);
+            console.log(`[UI] Selected Parcel Number: ${num}`);
+        };
 
         for (let i = 1; i <= 32; i++) {
             const btn = document.createElement('button');
@@ -422,11 +431,14 @@ class MinecraftGame {
             btn.innerText = `${i}번`;
             btn.dataset.num = i;
 
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.num-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-                document.getElementById('selected-number').value = i;
-            });
+            const handleSelect = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                selectNumber(i, btn);
+            };
+
+            btn.addEventListener('click', handleSelect);
+            btn.addEventListener('touchstart', handleSelect, { passive: false });
 
             grid.appendChild(btn);
         }
