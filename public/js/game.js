@@ -1,4 +1,4 @@
-// 3D Voxel Engine & World Generator for 킹수학크래프트 (Flat World & 32 Colored Parcels & 3D Number Signs)
+// 3D Voxel Engine & World Generator for 킹수학크래프트 (Green Living Room Plaza & 32 Colored Parcels)
 class VoxelWorld {
     constructor(scene) {
         this.scene = scene;
@@ -78,7 +78,9 @@ class VoxelWorld {
         const texGlass = createPixelTexture('#e0f2fe', '#bae6fd');
         const texGlowstone = createPixelTexture('#fde047', '#eab308');
         const texDiamond = createPixelTexture('#00ffff', '#0284c7', false, false, false, true);
-        const texPlazaTop = createPixelTexture('#f8fafc', '#cbd5e1', false, false, true);
+        
+        // Lush Green Living Room Floor Texture (녹색 거실 잔디 타일)
+        const texGreenPlazaTop = createPixelTexture('#22c55e', '#16a34a', false, false, true);
 
         this.materials = [
             null, // 0: Air
@@ -105,7 +107,7 @@ class VoxelWorld {
             new THREE.MeshStandardMaterial({ map: texGlass, transparent: true, opacity: 0.6 }), // 7: Glass
             new THREE.MeshStandardMaterial({ map: texGlowstone, emissive: 0xfde047, emissiveIntensity: 0.5 }), // 8: Glowstone
             new THREE.MeshStandardMaterial({ map: texDiamond, emissive: 0x00ffff, emissiveIntensity: 0.3 }), // 9: Diamond Block
-            new THREE.MeshStandardMaterial({ map: texPlazaTop }), // 10: Plaza Tile
+            new THREE.MeshStandardMaterial({ map: texGreenPlazaTop }), // 10: Green Living Room Tile
             new THREE.MeshStandardMaterial({ map: texWoodTop })  // 11: Sign Wooden Post
         ];
 
@@ -213,7 +215,7 @@ class VoxelWorld {
         return 0;
     }
 
-    // Completely Flat World Generation (Y = 4 Flat Everywhere)
+    // Completely Flat World Generation (Y = 4 Flat Everywhere, Green Living Room)
     generateWorld() {
         const half = this.worldSize / 2;
         const groundHeight = 4;
@@ -225,7 +227,7 @@ class VoxelWorld {
                 for (let y = 0; y <= groundHeight; y++) {
                     if (y === groundHeight) {
                         if (parcel === 0) {
-                            // Center Public Plaza
+                            // Green Living Room Plaza (녹색 거실)
                             this.blocks.set(this.getKey(x, y, z), 10);
                         } else {
                             // 32 Distinct Parcel Colored Floor
@@ -516,9 +518,10 @@ class MinecraftGame {
             e.preventDefault();
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
+            const parcelPin = document.getElementById('parcel-pin').value.trim();
             const playerNum = parseInt(document.getElementById('selected-number').value || '1');
-            if (username && password) {
-                this.net.connect(username, password, playerNum);
+            if (username && password && parcelPin) {
+                this.net.connect(username, password, parcelPin, playerNum);
             }
         });
 
