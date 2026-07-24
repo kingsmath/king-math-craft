@@ -676,6 +676,64 @@ body, html {
     box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
 }
 
+/* "월드 입장하기" Login Button - extra polish with a gold/blue glow pulse */
+#btn-login {
+    padding: 16px 24px;
+    font-size: 17px;
+    letter-spacing: 0.3px;
+    background: linear-gradient(135deg, #2563eb, #3b82f6 55%, #f59e0b);
+    box-shadow: 0 8px 22px rgba(59, 130, 246, 0.45);
+    animation: loginBtnGlow 2.6s ease-in-out infinite;
+}
+
+#btn-login:hover {
+    transform: translateY(-3px) scale(1.015);
+    box-shadow: 0 12px 30px rgba(245, 158, 11, 0.55);
+}
+
+#btn-login:disabled {
+    animation: none;
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+@keyframes loginBtnGlow {
+    0%, 100% { box-shadow: 0 8px 22px rgba(59, 130, 246, 0.45); }
+    50% { box-shadow: 0 10px 28px rgba(245, 158, 11, 0.55); }
+}
+
+.btn-arrow-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+/* Top-right "다른 게임 고르기" link on the landing screen */
+#other-games-link {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 110;
+    padding: 9px 16px;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 30px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+#other-games-link:hover {
+    background: rgba(59, 130, 246, 0.55);
+    border-color: rgba(59, 130, 246, 0.8);
+    transform: translateY(-2px);
+}
+
 /* Day/Night Clock Badge */
 #daynight-clock {
     padding: 10px 16px;

@@ -1101,6 +1101,11 @@ class MinecraftGame {
             // BUGFIX: while the chat box is focused/open, typed characters (w/a/s/d, space,
             // number keys, h, etc.) must NOT leak into game hotkeys (movement, jump, hotbar, controls popup).
             if (isChatOpen && document.activeElement === chatInput) {
+                // Prevent the native <form> submit-on-Enter default action, which was
+                // reloading the page (and dumping the player back to the login screen)
+                // instead of just sending the chat message.
+                if (e.code === 'Enter') e.preventDefault();
+
                 if (e.code === 'Enter') {
                     if (chatInput.value.trim()) {
                         this.net.sendChatMessage(chatInput.value.trim());
@@ -1207,6 +1212,13 @@ class MinecraftGame {
         });
 
         this.canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        // Chat Form Submission Guard (defensive backstop against native form-submit/page-reload,
+        // e.g. from mobile virtual keyboard "Send" actions that fire 'submit' directly)
+        const chatFormEl = document.getElementById('chat-form');
+        if (chatFormEl) {
+            chatFormEl.addEventListener('submit', (e) => e.preventDefault());
+        }
 
         // Login Form Submission
         document.getElementById('login-form').addEventListener('submit', (e) => {
