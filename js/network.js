@@ -41,17 +41,24 @@ class NetworkManager {
     }
 
     async checkRoomId(roomId) {
-        try {
-            const url = `${this.getHttpBaseUrl()}/api/check-room?id=${encodeURIComponent(roomId)}`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000);
-            const res = await fetch(url, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (!res.ok) return { exists: false, registered_numbers: [] };
-            return await res.json();
-        } catch (e) {
-            return { exists: false, registered_numbers: [] };
+        const fetchUrl = `${this.getHttpBaseUrl()}/api/check-room?id=${encodeURIComponent(roomId)}`;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                const res = await fetch(fetchUrl, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                if (res.ok) return await res.json();
+            } catch (e) {
+                console.warn(`[Network] checkRoomId attempt ${attempt + 1} failed:`, e);
+            }
         }
+        return { exists: false, registered_numbers: [] };
     }
 
     connect(username, password, parcelPin, playerNum) {

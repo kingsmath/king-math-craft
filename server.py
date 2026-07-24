@@ -1028,6 +1028,17 @@ async def index_handler(request):
     return web.FileResponse(BASE_DIR / "index.html")
 
 
+async def options_handler(request):
+    return web.Response(
+        status=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        }
+    )
+
+
 async def check_room_handler(request):
     room_id = request.query.get("id", "").strip()
     matched_room = next((r for r in rooms.values() if r.get("room_id") == room_id), None)
@@ -1066,6 +1077,7 @@ def create_app():
 
     app.router.add_get('/ws', websocket_handler)
     app.router.add_get('/api/check-room', check_room_handler)
+    app.router.add_options('/api/check-room', options_handler)
     app.router.add_get('/', index_handler)
     app.router.add_static('/', path=str(BASE_DIR))
     return app
