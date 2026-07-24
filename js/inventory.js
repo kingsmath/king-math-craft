@@ -91,6 +91,8 @@ const FOODS = {
 
 const COOK_MAP = { raw_meat: 'cooked_meat', raw_fish: 'cooked_fish' };
 
+const INFINITE_RESOURCES = new Set(['dirt', 'grass', 'stone', 'wood', 'leaves', 'brick', 'glass', 'glowstone', 'diamond_block']);
+
 class InventorySystem {
     constructor(game) {
         this.game = game;
@@ -159,11 +161,15 @@ class InventorySystem {
     }
 
     hasResources(cost) {
-        return Object.entries(cost).every(([k, v]) => (this.resources[k] || 0) >= v);
+        return Object.entries(cost).every(([k, v]) => INFINITE_RESOURCES.has(k) || (this.resources[k] || 0) >= v);
     }
 
     consumeResources(cost) {
-        Object.entries(cost).forEach(([k, v]) => { this.resources[k] = (this.resources[k] || 0) - v; });
+        Object.entries(cost).forEach(([k, v]) => {
+            if (!INFINITE_RESOURCES.has(k)) {
+                this.resources[k] = (this.resources[k] || 0) - v;
+            }
+        });
     }
 
     // --- Crafting / Equipment -------------------------------------------
@@ -442,8 +448,20 @@ class InventorySystem {
         const equipGrid = document.getElementById('inventory-equip-grid');
         if (grid) {
             grid.innerHTML = '';
+
+            // Render infinite base building materials
+            INFINITE_RESOURCES.forEach((key) => {
+                const icon = RESOURCE_ICONS[key] || '📦';
+                const name = RESOURCE_NAMES[key] || key;
+                const cell = document.createElement('div');
+                cell.className = 'inv-cell infinite-cell';
+                cell.innerHTML = `<div class="inv-icon">${icon}</div><div class="inv-qty">♾️</div><div class="inv-name">${name}</div>`;
+                grid.appendChild(cell);
+            });
+
+            // Render collected survival loot & items
             Object.entries(this.resources).forEach(([key, qty]) => {
-                if (!qty) return;
+                if (!qty || INFINITE_RESOURCES.has(key)) return;
                 const icon = RESOURCE_ICONS[key] || (RECIPES[key] ? RECIPES[key].icon : '📦');
                 const name = RECIPES[key] ? RECIPES[key].name : (FOODS[key] ? FOODS[key].name : (RESOURCE_NAMES[key] || key));
                 const cell = document.createElement('div');
@@ -451,7 +469,6 @@ class InventorySystem {
                 cell.innerHTML = `<div class="inv-icon">${icon}</div><div class="inv-qty">${qty}</div><div class="inv-name">${name}</div>`;
                 grid.appendChild(cell);
             });
-            if (!grid.children.length) grid.innerHTML = '<div class="inv-empty">아직 모은 자원이 없습니다. 나무/돌/동굴 광석을 채집해보세요!</div>';
         }
         if (equipGrid) {
             equipGrid.innerHTML = '';
