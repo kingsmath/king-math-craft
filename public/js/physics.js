@@ -1,4 +1,4 @@
-// Player Physics & Boundary Engine (15x15 Parcels, Unbreakable Base, Strict Outer World Clamp)
+// Player Physics & Natural Movement Engine (15x15 Parcels, Unbreakable Base, Smooth Lerp Inertia & Head Bobbing)
 class PlayerPhysics {
     constructor(world) {
         this.world = world;
@@ -26,12 +26,16 @@ class PlayerPhysics {
             sprint: false
         };
 
-        // Boosted Fast Movement Speeds
+        // Natural Minecraft Movement Speeds
         this.walkSpeed = 10.0;
         this.sprintSpeed = 16.0;
         this.sneakSpeed = 4.0;
         this.jumpForce = 9.2;
         this.gravity = 24.0;
+
+        // Natural Head Bobbing Timer
+        this.bobTimer = 0;
+        this.currentBobOffset = 0;
     }
 
     getParcelNumber(x, z) {
@@ -100,7 +104,7 @@ class PlayerPhysics {
         const currentEyeHeight = this.keys.sneak ? 1.45 : this.eyeHeight;
         return new THREE.Vector3(
             this.position.x,
-            this.position.y + currentEyeHeight,
+            this.position.y + currentEyeHeight + this.currentBobOffset,
             this.position.z
         );
     }
@@ -121,7 +125,7 @@ class PlayerPhysics {
     update(delta) {
         if (delta > 0.1) delta = 0.1;
 
-        // Apply Speed Modifiers (Sprint / Sneak)
+        // Speed Modifiers (Sprint / Sneak)
         let currentSpeed = this.walkSpeed;
         if (this.keys.sprint && !this.keys.sneak) {
             currentSpeed = this.sprintSpeed;
@@ -129,7 +133,7 @@ class PlayerPhysics {
             currentSpeed = this.sneakSpeed;
         }
 
-        // Standard FPS Movement Vectors (Forward / Right)
+        // Standard Movement Inputs
         let forwardInput = 0;
         let rightInput = 0;
 
@@ -138,7 +142,12 @@ class PlayerPhysics {
         if (this.keys.right) rightInput += 1;
         if (this.keys.left) rightInput -= 1;
 
-        if (forwardInput !== 0 || rightInput !== 0) {
+        let targetVx = 0;
+        let targetVz = 0;
+
+        const isMoving = (forwardInput !== 0 || rightInput !== 0);
+
+        if (isMoving) {
             const length = Math.sqrt(forwardInput * forwardInput + rightInput * rightInput);
             forwardInput /= length;
             rightInput /= length;
@@ -146,16 +155,28 @@ class PlayerPhysics {
             const sinYaw = Math.sin(this.rotation.y);
             const cosYaw = Math.cos(this.rotation.y);
 
-            // Exact FPS Directional Math
             const dx = forwardInput * (-sinYaw) + rightInput * cosYaw;
             const dz = forwardInput * (-cosYaw) + rightInput * (-sinYaw);
 
-            this.velocity.x = dx * currentSpeed;
-            this.velocity.z = dz * currentSpeed;
+            targetVx = dx * currentSpeed;
+            targetVz = dz * currentSpeed;
+
+            // Natural Head Bobbing Effect while walking on ground
+            if (this.onGround) {
+                this.bobTimer += delta * (this.keys.sprint ? 16.0 : 10.0);
+                this.currentBobOffset = Math.sin(this.bobTimer) * 0.05;
+            } else {
+                this.currentBobOffset *= 0.8;
+            }
         } else {
-            this.velocity.x *= 0.2;
-            this.velocity.z *= 0.2;
+            this.currentBobOffset *= 0.8;
+            this.bobTimer = 0;
         }
+
+        // Smooth Lerp Acceleration / Deceleration for Natural Human Physics Inertia
+        const lerpRate = this.onGround ? 12.0 : 3.5;
+        this.velocity.x += (targetVx - this.velocity.x) * Math.min(1.0, delta * lerpRate);
+        this.velocity.z += (targetVz - this.velocity.z) * Math.min(1.0, delta * lerpRate);
 
         // Traditional Jump
         if (this.keys.jump && this.onGround) {
@@ -186,7 +207,7 @@ class PlayerPhysics {
         const minWorld = -79.5;
         if (this.position.x < minWorld) { this.position.x = minWorld; this.velocity.x = 0; }
         if (this.position.x > maxWorld) { this.position.x = maxWorld; this.velocity.x = 0; }
-        if (this.position.z < minWorld) { this.position.z = minWorld; this.velocity.x = 0; }
+        if (this.position.z < minWorld) { this.position.z = minWorld; this.velocity.z = 0; }
         if (this.position.z > maxWorld) { this.position.z = maxWorld; this.velocity.z = 0; }
     }
 

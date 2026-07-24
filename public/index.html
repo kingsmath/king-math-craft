@@ -34,7 +34,7 @@
 
             <!-- Header Action Buttons -->
             <div class="btn-group-top">
-                <button id="btn-toggle-controls" class="btn-controls glass-panel" title="조작법 창 켜기/끄기">
+                <button id="btn-toggle-controls" class="btn-controls glass-panel" title="조작법 접기/펴기">
                     <span>❓ 조작법</span>
                 </button>
                 <button id="btn-save-map" class="btn-save glass-panel" title="서버에 지도 저장">
@@ -55,21 +55,18 @@
             </div>
         </div>
 
-        <!-- Controls Info (Top Left - Toggleable Panel) -->
-        <div id="controls-info" class="glass-panel">
-            <div class="panel-header">
-                <span class="panel-title">🎮 마인크래프트 조작법 (15x15 개인땅)</span>
-                <button id="btn-close-controls" class="btn-close-sm" title="조작법 닫기">❌ 닫기</button>
+        <!-- Controls Info (Top Left - Accordion Foldable Panel) -->
+        <div id="controls-info" class="glass-panel collapsed">
+            <div class="panel-header" id="controls-header" title="클릭하여 조작법 접기/펴기">
+                <span class="panel-title">🎮 조작법 <span id="accordion-icon" class="accordion-icon">▼</span></span>
             </div>
-            <ul>
+            <ul id="controls-list">
                 <li><span class="key">WASD</span> / <span class="key">터치 조이스틱</span> 이동</li>
                 <li><span class="key">Space</span> 점프 / <span class="key">Shift</span> 숙이기</li>
                 <li><span class="key">좌클릭</span> 파괴 / <span class="key">우클릭</span> 설치</li>
                 <li><span class="key">1~9</span> / <span class="key">휠</span> 핫바 9슬롯 선택</li>
-                <li><span class="key">F5</span> 시점 변경 (1인칭/3인칭)</li>
-                <li><span class="key">H</span> 조작법 창 켜기/끄기</li>
+                <li><span class="key">F5</span> 시점 변경 / <span class="key">H</span> 조작법 접기/펴기</li>
                 <li><span class="key">T</span> / <span class="key">Enter</span> 채팅창 열기</li>
-                <li><span class="key">ESC</span> 마우스 커서 해제</li>
             </ul>
         </div>
 
@@ -97,16 +94,16 @@
             <div class="hotbar-slot" data-slot="9"><span class="slot-num">9</span><div class="icon diamond"></div><span class="slot-name">다이아</span></div>
         </div>
 
-        <!-- Mobile & Tablet Active Dynamic Touch Joystick Controls Overlay -->
+        <!-- Mobile & Tablet Touch Controls (Bottom Left Active Joystick + Bottom Right Action Buttons) -->
         <div id="touch-controls">
-            <!-- Active Movable Touch Joystick -->
+            <!-- Bottom Left Active Movable Dynamic Touch Joystick -->
             <div id="joystick-container">
                 <div id="joystick-base">
                     <div id="joystick-knob"></div>
                 </div>
             </div>
 
-            <!-- Action Touch Buttons -->
+            <!-- Bottom Right Action Touch Buttons -->
             <div id="touch-actions">
                 <button id="btn-touch-break" class="touch-btn action-btn btn-break">🔨 파괴</button>
                 <button id="btn-touch-place" class="touch-btn action-btn btn-place">🧱 설치</button>

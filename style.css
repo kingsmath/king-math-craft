@@ -201,46 +201,58 @@ body, html {
     justify-content: space-between;
 }
 
-/* Controls Info Panel (Top Left - Toggleable) */
+/* Controls Info Panel (Top Left - Accordion Foldable Format) */
 #controls-info {
     position: absolute;
     top: 75px;
     left: 16px;
-    padding: 14px 18px;
+    padding: 12px 16px;
     width: 280px;
     font-size: 13px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 14;
 }
 
-.panel-header {
+#controls-header {
+    cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+
+#controls-header:hover .panel-title {
+    color: #fde047;
 }
 
 .panel-title {
     font-weight: 700;
     color: var(--accent-gold);
     font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
 }
 
-.btn-close-sm {
-    background: rgba(239, 68, 68, 0.3);
-    border: 1px solid rgba(239, 68, 68, 0.5);
-    color: #fca5a5;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s ease;
+.accordion-icon {
+    font-size: 10px;
+    margin-left: 8px;
+    transition: transform 0.25s ease;
+    display: inline-block;
+    color: #60a5fa;
 }
 
-.btn-close-sm:hover {
-    background: rgba(239, 68, 68, 0.8);
-    color: #fff;
+#controls-info.collapsed #controls-list {
+    display: none;
+}
+
+#controls-info.collapsed .accordion-icon {
+    transform: rotate(-90deg);
+}
+
+#controls-info.collapsed {
+    padding: 10px 16px;
+    width: auto;
 }
 
 #controls-info ul {
@@ -248,6 +260,9 @@ body, html {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 #controls-info li {
@@ -354,15 +369,9 @@ body, html {
     font-weight: 600;
 }
 
-/* Touch Controls Overlay */
+/* Touch Controls Overlay - Bottom Left Joystick & Bottom Right Actions */
 #touch-controls {
-    display: none; /* Shown on Mobile/Tablet via JS or media query */
-}
-
-@media (max-width: 1024px) {
-    #touch-controls {
-        display: block;
-    }
+    display: block; /* Always enabled for mobile/tablet & touch devices */
 }
 
 #joystick-container {
@@ -378,8 +387,8 @@ body, html {
 #joystick-base {
     width: 100%;
     height: 100%;
-    background: rgba(255, 255, 255, 0.15);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.18);
+    border: 2px solid rgba(255, 255, 255, 0.35);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -390,7 +399,7 @@ body, html {
 #joystick-knob {
     width: 50px;
     height: 50px;
-    background: rgba(59, 130, 246, 0.8);
+    background: rgba(59, 130, 246, 0.85);
     border: 2px solid #ffffff;
     border-radius: 50%;
     box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
@@ -419,10 +428,10 @@ body, html {
     backdrop-filter: blur(8px);
 }
 
-.btn-break { background: rgba(239, 68, 68, 0.6); }
-.btn-place { background: rgba(34, 197, 94, 0.6); }
-.btn-jump { background: rgba(59, 130, 246, 0.6); }
-.btn-cam { background: rgba(245, 158, 11, 0.6); }
+.btn-break { background: rgba(239, 68, 68, 0.65); }
+.btn-place { background: rgba(34, 197, 94, 0.65); }
+.btn-jump { background: rgba(59, 130, 246, 0.65); }
+.btn-cam { background: rgba(245, 158, 11, 0.65); }
 
 /* Chat Box */
 #chat-container {

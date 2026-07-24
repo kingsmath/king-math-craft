@@ -461,7 +461,7 @@ class MinecraftGame {
         }
     }
 
-    // Active Movable Dynamic Touch Joystick Implementation
+    // Active Movable Dynamic Touch Joystick Implementation (Bottom-Left Joystick, Bottom-Right Actions)
     initActiveTouchJoystick() {
         const container = document.getElementById('joystick-container');
         const knob = document.getElementById('joystick-knob');
@@ -567,7 +567,7 @@ class MinecraftGame {
             if (activeTouchId === 'mouse') handleEnd(e);
         });
 
-        // Break Block Button
+        // Break Block Button (Bottom-Right)
         const breakBtn = document.getElementById('btn-touch-break');
         if (breakBtn) {
             breakBtn.addEventListener('click', (e) => {
@@ -584,7 +584,7 @@ class MinecraftGame {
             });
         }
 
-        // Place Block Button
+        // Place Block Button (Bottom-Right)
         const placeBtn = document.getElementById('btn-touch-place');
         if (placeBtn) {
             placeBtn.addEventListener('click', (e) => {
@@ -597,7 +597,7 @@ class MinecraftGame {
             });
         }
 
-        // Jump Button
+        // Jump Button (Bottom-Right)
         const jumpBtn = document.getElementById('btn-touch-jump');
         if (jumpBtn) {
             const jumpPress = (e) => {
@@ -614,7 +614,7 @@ class MinecraftGame {
             jumpBtn.addEventListener('mouseup', jumpRelease);
         }
 
-        // Camera Switch Button
+        // Camera Switch Button (Bottom-Right)
         const camBtn = document.getElementById('btn-touch-cam');
         if (camBtn) {
             camBtn.addEventListener('click', (e) => {
@@ -659,21 +659,27 @@ class MinecraftGame {
             this.renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Controls Info Toggle & Close Buttons
+        // Accordion Fold/Unfold Controls Info Event Handlers
         const toggleControlsBtn = document.getElementById('btn-toggle-controls');
-        const closeControlsBtn = document.getElementById('btn-close-controls');
+        const controlsHeader = document.getElementById('controls-header');
         const controlsInfo = document.getElementById('controls-info');
 
-        if (toggleControlsBtn && controlsInfo) {
+        const toggleAccordion = () => {
+            if (controlsInfo) {
+                controlsInfo.classList.toggle('collapsed');
+            }
+        };
+
+        if (toggleControlsBtn) {
             toggleControlsBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                controlsInfo.classList.toggle('hidden');
+                toggleAccordion();
             });
         }
-        if (closeControlsBtn && controlsInfo) {
-            closeControlsBtn.addEventListener('click', (e) => {
+        if (controlsHeader) {
+            controlsHeader.addEventListener('click', (e) => {
                 e.preventDefault();
-                controlsInfo.classList.add('hidden');
+                toggleAccordion();
             });
         }
 
@@ -707,9 +713,9 @@ class MinecraftGame {
                 this.cameraMode = (this.cameraMode + 1) % 3;
             }
 
-            // 'H' key toggles controls overlay
+            // 'H' key toggles/folds controls overlay
             if (e.code === 'KeyH') {
-                if (controlsInfo) controlsInfo.classList.toggle('hidden');
+                toggleAccordion();
             }
 
             if (e.code === 'KeyT' || e.code === 'Enter') {
