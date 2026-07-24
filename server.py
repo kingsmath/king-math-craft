@@ -14,9 +14,9 @@ if hasattr(sys.stdout, 'reconfigure'):
     except Exception:
         pass
 
-# Configurations
+# Configurations - Environment PORT support for Render & Cloud deployments
 HOST = "0.0.0.0"
-PORT = 8000
+PORT = int(os.environ.get("PORT", 8000))
 MAX_PLAYERS_PER_ROOM = 32  # Up to 32 players (1번~32번) simultaneously
 DATA_PURGE_TIMEOUT = 30 * 24 * 3600  # 30 days in seconds (2,592,000s)
 
@@ -480,7 +480,7 @@ def create_app():
 if __name__ == "__main__":
     print("=" * 60)
     print(f"  [KING MATH CRAFT] Web Server Running!")
-    print(f"  [URL] http://localhost:{PORT}")
+    print(f"  [URL] http://0.0.0.0:{PORT}")
     print(f"  [LIMIT] Max Players per Room: {MAX_PLAYERS_PER_ROOM}")
     print(f"  [PARCELS] 32 Parcels (15x15 blocks each) + 4 Corner Living Rooms")
     print("=" * 60)
