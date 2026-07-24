@@ -1,4 +1,4 @@
-// Player Physics & Fast Responsive Controls Engine (15x15 Parcels, Optimized Speed)
+// Player Physics & Boundary Engine (15x15 Parcels, Unbreakable Base, Strict Outer World Clamp)
 class PlayerPhysics {
     constructor(world) {
         this.world = world;
@@ -26,11 +26,11 @@ class PlayerPhysics {
             sprint: false
         };
 
-        // Boosted Fast Movement Speeds for Large 15x15 Parcels & 120x120 Plaza
-        this.walkSpeed = 10.0;   // Increased from 6.0 -> 10.0 for swift movement
-        this.sprintSpeed = 16.0; // Increased from 9.0 -> 16.0 for fast sprinting
-        this.sneakSpeed = 4.0;   // Increased from 2.4 -> 4.0
-        this.jumpForce = 9.2;    // Responsive jump
+        // Boosted Fast Movement Speeds
+        this.walkSpeed = 10.0;
+        this.sprintSpeed = 16.0;
+        this.sneakSpeed = 4.0;
+        this.jumpForce = 9.2;
         this.gravity = 24.0;
     }
 
@@ -172,7 +172,7 @@ class PlayerPhysics {
         this.moveAxis(0, 0, this.velocity.z * delta);
         this.moveAxis(0, this.velocity.y * delta, 0);
 
-        // Parcel Border Barrier Check
+        // Parcel Border Barrier Check (Inside world)
         const currentParcel = this.getParcelNumber(this.position.x, this.position.z);
         if (currentParcel !== 0 && currentParcel !== this.playerNumber) {
             this.position.x -= this.velocity.x * delta * 1.5;
@@ -180,6 +180,14 @@ class PlayerPhysics {
             this.velocity.x = 0;
             this.velocity.z = 0;
         }
+
+        // Strict Outer World Boundary Clamp (-79.5 to 78.5)
+        const maxWorld = 78.5;
+        const minWorld = -79.5;
+        if (this.position.x < minWorld) { this.position.x = minWorld; this.velocity.x = 0; }
+        if (this.position.x > maxWorld) { this.position.x = maxWorld; this.velocity.x = 0; }
+        if (this.position.z < minWorld) { this.position.z = minWorld; this.velocity.x = 0; }
+        if (this.position.z > maxWorld) { this.position.z = maxWorld; this.velocity.z = 0; }
     }
 
     moveAxis(dx, dy, dz) {

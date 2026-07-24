@@ -32,8 +32,11 @@
                 <span id="display-my-number" class="highlight">내 번호: 1번</span>
             </div>
 
-            <!-- Anyone Can Save Map & Download Map Buttons -->
+            <!-- Header Action Buttons -->
             <div class="btn-group-top">
+                <button id="btn-toggle-controls" class="btn-controls glass-panel" title="조작법 창 켜기/끄기">
+                    <span>❓ 조작법</span>
+                </button>
                 <button id="btn-save-map" class="btn-save glass-panel" title="서버에 지도 저장">
                     <span>💾 지도 저장</span>
                 </button>
@@ -52,15 +55,19 @@
             </div>
         </div>
 
-        <!-- Controls Info (Top Left - Traditional Minecraft Controls) -->
+        <!-- Controls Info (Top Left - Toggleable Panel) -->
         <div id="controls-info" class="glass-panel">
-            <div class="panel-title">🎮 마인크래프트 조작법 (15x15 개인땅)</div>
+            <div class="panel-header">
+                <span class="panel-title">🎮 마인크래프트 조작법 (15x15 개인땅)</span>
+                <button id="btn-close-controls" class="btn-close-sm" title="조작법 닫기">❌ 닫기</button>
+            </div>
             <ul>
                 <li><span class="key">WASD</span> / <span class="key">터치 조이스틱</span> 이동</li>
                 <li><span class="key">Space</span> 점프 / <span class="key">Shift</span> 숙이기</li>
                 <li><span class="key">좌클릭</span> 파괴 / <span class="key">우클릭</span> 설치</li>
                 <li><span class="key">1~9</span> / <span class="key">휠</span> 핫바 9슬롯 선택</li>
                 <li><span class="key">F5</span> 시점 변경 (1인칭/3인칭)</li>
+                <li><span class="key">H</span> 조작법 창 켜기/끄기</li>
                 <li><span class="key">T</span> / <span class="key">Enter</span> 채팅창 열기</li>
                 <li><span class="key">ESC</span> 마우스 커서 해제</li>
             </ul>

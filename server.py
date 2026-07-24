@@ -381,6 +381,14 @@ async def websocket_handler(request):
                     z = int(data.get("z"))
                     block_type = int(data.get("blockType"))
 
+                    # Base Ground Floor (Y <= 4) is Unbreakable!
+                    if y <= 4 and block_type == 0:
+                        await ws.send_str(json.dumps({
+                            "type": "block_denied",
+                            "message": "⚠️ 가장 바닥 잔디/지형은 파괴할 수 없습니다!"
+                        }))
+                        continue
+
                     parcel = get_parcel_number(x, z)
                     user_num = session_info["player_number"]
 

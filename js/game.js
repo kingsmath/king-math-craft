@@ -575,6 +575,10 @@ class MinecraftGame {
                 const target = this.physics.raycastTarget(6.0);
                 if (target.hit) {
                     const { x, y, z } = target.targetBlock;
+                    if (y <= 4) {
+                        this.showToast('⚠️ 가장 바닥 지형은 파괴할 수 없습니다!');
+                        return;
+                    }
                     this.net.sendBlockChange(x, y, z, 0);
                 }
             });
@@ -655,6 +659,24 @@ class MinecraftGame {
             this.renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
+        // Controls Info Toggle & Close Buttons
+        const toggleControlsBtn = document.getElementById('btn-toggle-controls');
+        const closeControlsBtn = document.getElementById('btn-close-controls');
+        const controlsInfo = document.getElementById('controls-info');
+
+        if (toggleControlsBtn && controlsInfo) {
+            toggleControlsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                controlsInfo.classList.toggle('hidden');
+            });
+        }
+        if (closeControlsBtn && controlsInfo) {
+            closeControlsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                controlsInfo.classList.add('hidden');
+            });
+        }
+
         // Mouse Look Rotation (Standard FPS Control)
         document.addEventListener('mousemove', (e) => {
             if (document.pointerLockElement === this.canvas) {
@@ -683,6 +705,11 @@ class MinecraftGame {
             if (e.code === 'F5') {
                 e.preventDefault();
                 this.cameraMode = (this.cameraMode + 1) % 3;
+            }
+
+            // 'H' key toggles controls overlay
+            if (e.code === 'KeyH') {
+                if (controlsInfo) controlsInfo.classList.toggle('hidden');
             }
 
             if (e.code === 'KeyT' || e.code === 'Enter') {
@@ -732,6 +759,10 @@ class MinecraftGame {
             if (target.hit) {
                 if (e.button === 0) {
                     const { x, y, z } = target.targetBlock;
+                    if (y <= 4) {
+                        this.showToast('⚠️ 가장 바닥 지형은 파괴할 수 없습니다!');
+                        return;
+                    }
                     this.net.sendBlockChange(x, y, z, 0);
                 } else if (e.button === 2) {
                     const { x, y, z } = target.placeBlock;
