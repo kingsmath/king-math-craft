@@ -1,4 +1,4 @@
-// Network Manager - Multiplayer WebSocket & Random Player Clothes Colors
+// Network Manager - Multiplayer WebSocket Protocol matching server.py EXACTLY
 class NetworkManager {
     constructor(game) {
         this.game = game;
@@ -6,17 +6,20 @@ class NetworkManager {
         this.remotePlayers = new Map();
         this.username = '';
         this.parcelNumber = 1;
+        this.myId = null;
         
-        // Dynamic WebSocket protocol matching current host
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        this.serverUrl = `${protocol}//${window.location.host}`;
-
         // Available Vibrant Shirt Colors for Random Avatar Clothes
         this.shirtColors = [
             0xef4444, 0xf97316, 0xf59e0b, 0x84cc16, 0x10b981, 0x06b6d4,
             0x3b82f6, 0x6366f1, 0x8b5cf6, 0xd946ef, 0xec4899, 0x14b8a6,
             0x0284c7, 0x7c3aed, 0xdb2777, 0xe11d48, 0x059669, 0xd97706
         ];
+    }
+
+    getServerUrl() {
+        const host = window.location.host || 'localhost:8000';
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${protocol}//${host}/ws`;
     }
 
     connect(username, password, parcelPin, playerNum) {
@@ -31,21 +34,25 @@ class NetworkManager {
             loginBtn.disabled = true;
         }
 
+        const serverUrl = this.getServerUrl();
+        console.log(`[Network] Connecting to WebSocket URL: ${serverUrl}`);
+
         try {
-            this.ws = new WebSocket(this.serverUrl);
+            this.ws = new WebSocket(serverUrl);
         } catch (e) {
             this.showLoginError('서버 연결 실패: ' + e.message);
             return;
         }
 
         this.ws.onopen = () => {
-            console.log('[Network] Connected to server.');
+            console.log('[Network] Connected to server successfully.');
+            // Send exact login message matching server.py
             this.send({
-                type: 'join',
-                room_id: username, // Using username as room_id
+                type: 'login',
+                username: username,
                 password: password,
-                parcel_pin: parcelPin,
-                parcel_num: playerNum
+                parcelPin: parcelPin,
+                playerNumber: playerNum
             });
         };
 
@@ -90,9 +97,14 @@ class NetworkManager {
 
     handleMessage(data) {
         switch (data.type) {
-            case 'init':
-                console.log('[Network] Joined successfully as player ID:', data.id);
-                this.myId = data.id;
+            case 'login_res':
+                if (!data.success) {
+                    this.showLoginError(data.message || '로그인 실패');
+                    return;
+                }
+
+                console.log('[Network] Login success! Session ID:', data.session_id);
+                this.myId = data.session_id;
 
                 // Update UI Room Info
                 document.getElementById('login-modal').classList.add('hidden');
@@ -100,47 +112,84 @@ class NetworkManager {
                 document.getElementById('display-room-name').innerText = `방: ${this.username}`;
                 document.getElementById('display-my-number').innerText = `내 번호: ${this.parcelNumber}번`;
 
-                // If existing blocks sent from server
-                if (data.blocks) {
-                    Object.entries(data.blocks).forEach(([key, type]) => {
+                // Load World Edits from server
+                if (data.world_edits) {
+                    Object.entries(data.world_edits).forEach(([key, blockType]) => {
                         const [x, y, z] = key.split(',').map(Number);
-                        this.game.world.setBlock(x, y, z, type, false);
+                        this.game.world.setBlock(x, y, z, blockType, false);
                     });
                     this.game.world.rebuildAllChunks();
                 }
 
+                // Render existing players
+                if (data.existing_players) {
+                    data.existing_players.forEach(pData => {
+                        this.addOrUpdateRemotePlayer(pData.id, pData);
+                    });
+                }
+
+                // Update player count badge
+                const countBadge = document.getElementById('player-count-badge');
+                if (countBadge) {
+                    const total = (data.existing_players ? data.existing_players.length : 0) + 1;
+                    countBadge.innerText = `${total} / 32`;
+                }
+
                 // If host map load prompt required
-                if (data.is_host && data.has_saved_map) {
+                if (data.prompt_host_load) {
                     this.game.showHostLoadModal();
                 } else {
                     this.game.start();
                 }
                 break;
 
-            case 'error':
-                this.showLoginError(data.message);
-                break;
-
             case 'player_joined':
-                this.game.showToast(`🎮 [${data.player.parcel_num}번] 님이 입장하셨습니다!`);
+                this.game.showToast(`🎮 [${data.player.player_number}번] 님이 입장하셨습니다!`);
+                this.addOrUpdateRemotePlayer(data.player.id, data.player);
                 break;
 
             case 'player_left':
-                this.game.showToast(`🚪 [${data.id}] 님이 퇴장하셨습니다.`);
+                this.game.showToast(`🚪 [${data.display_name || data.id}] 님이 퇴장하셨습니다.`);
                 this.removeRemotePlayer(data.id);
                 break;
 
-            case 'world_state':
-                this.updateWorldState(data.players);
+            case 'player_count':
+                const badge = document.getElementById('player-count-badge');
+                if (badge) badge.innerText = `${data.count} / ${data.max}`;
                 break;
 
-            case 'block_change':
-                this.game.world.setBlock(data.x, data.y, data.z, data.block_type);
-                if (data.block_type === 0) sfx.playBreak();
+            case 'player_moved':
+                if (data.id !== this.myId) {
+                    this.addOrUpdateRemotePlayer(data.id, data);
+                }
+                break;
+
+            case 'block_changed':
+                this.game.world.setBlock(data.x, data.y, data.z, data.blockType);
+                if (data.blockType === 0) sfx.playBreak();
                 else sfx.playPlace();
                 break;
 
-            case 'chat':
+            case 'block_denied':
+                this.game.showToast(data.message || '⚠️ 수용할 수 없는 작업입니다.');
+                break;
+
+            case 'reload_world_edits':
+                if (data.world_edits) {
+                    Object.entries(data.world_edits).forEach(([key, blockType]) => {
+                        const [x, y, z] = key.split(',').map(Number);
+                        this.game.world.setBlock(x, y, z, blockType, false);
+                    });
+                    this.game.world.rebuildAllChunks();
+                }
+                if (data.msg) this.game.showToast(`📜 ${data.msg}`);
+                break;
+
+            case 'map_saved_notify':
+                if (data.msg) this.game.showToast(`💾 ${data.msg}`);
+                break;
+
+            case 'chat_msg':
                 this.game.addChatMessage(data.sender, data.text);
                 break;
         }
@@ -158,13 +207,13 @@ class NetworkManager {
         // Local instant update
         this.game.world.setBlock(x, y, z, blockType);
 
-        // Send to server
+        // Send to server (matching server.py format)
         this.send({
             type: 'block_change',
             x: x,
             y: y,
             z: z,
-            block_type: blockType
+            blockType: blockType
         });
 
         if (blockType === 0) sfx.playBreak();
@@ -172,20 +221,15 @@ class NetworkManager {
     }
 
     sendSaveMapRequest() {
-        const roomName = this.username || '수학방';
-        const blocksObj = Object.fromEntries(this.game.world.blocks);
         this.send({
-            type: 'save_map',
-            room_id: roomName,
-            blocks: blocksObj
+            type: 'save_map'
         });
-        this.game.showToast(`💾 [${roomName}] 지도가 클라우드 서버에 안전하게 저장되었습니다!`);
     }
 
     sendHostLoadDecision(loadSavedMap) {
         this.send({
             type: 'host_load_decision',
-            load_saved_map: loadSavedMap
+            load: loadSavedMap
         });
     }
 
@@ -201,51 +245,34 @@ class NetworkManager {
         const pos = this.game.physics.position;
         const rot = this.game.physics.rotation;
         this.send({
-            type: 'move',
+            type: 'player_state',
             x: pos.x,
             y: pos.y,
             z: pos.z,
-            rx: rot.x,
-            ry: rot.y
+            rotX: rot.x,
+            rotY: rot.y,
+            isMoving: this.game.physics.keys.forward || this.game.physics.keys.backward || this.game.physics.keys.left || this.game.physics.keys.right,
+            selectedSlot: this.game.selectedSlot
         });
     }
 
-    // Render Remote 3D Player Avatars with Random Clothes Colors
-    updateWorldState(playersData) {
-        const activeIds = new Set();
-        let currentPlayersCount = 1; // Including local player
+    addOrUpdateRemotePlayer(id, pData) {
+        if (id === this.myId) return;
 
-        Object.entries(playersData).forEach(([id, pData]) => {
-            if (id === this.myId) return;
-            activeIds.add(id);
-            currentPlayersCount++;
-
-            if (!this.remotePlayers.has(id)) {
-                const meshGroup = this.createPlayerMesh(pData.parcel_num || 1, id);
-                this.game.scene.add(meshGroup);
-                this.remotePlayers.set(id, {
-                    group: meshGroup,
-                    targetPos: new THREE.Vector3(pData.x, pData.y, pData.z),
-                    targetRotY: pData.ry || 0
-                });
-            } else {
-                const rp = this.remotePlayers.get(id);
-                rp.targetPos.set(pData.x, pData.y, pData.z);
-                rp.targetRotY = pData.ry || 0;
-            }
-        });
-
-        // Update Scoreboard Count
-        const countBadge = document.getElementById('player-count-badge');
-        if (countBadge) countBadge.innerText = `${currentPlayersCount} / 32`;
-
-        // Remove disconnected players
-        this.remotePlayers.forEach((rp, id) => {
-            if (!activeIds.has(id)) {
-                this.game.scene.remove(rp.group);
-                this.remotePlayers.delete(id);
-            }
-        });
+        if (!this.remotePlayers.has(id)) {
+            const meshGroup = this.createPlayerMesh(pData.player_number || 1, id);
+            meshGroup.position.set(pData.x || 0, pData.y || 5.0, pData.z || 0);
+            this.game.scene.add(meshGroup);
+            this.remotePlayers.set(id, {
+                group: meshGroup,
+                targetPos: new THREE.Vector3(pData.x || 0, pData.y || 5.0, pData.z || 0),
+                targetRotY: pData.rotY || 0
+            });
+        } else {
+            const rp = this.remotePlayers.get(id);
+            if (pData.x !== undefined) rp.targetPos.set(pData.x, pData.y, pData.z);
+            if (pData.rotY !== undefined) rp.targetRotY = pData.rotY;
+        }
     }
 
     // Create 3D Minecraft Humanoid Character with Random Clothes Color
