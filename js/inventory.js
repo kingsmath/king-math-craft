@@ -5,9 +5,45 @@
 // (mob/PVP damage), but starvation damage & eating heals are requested via 'hp_delta'.
 
 const RESOURCE_ICONS = {
-    wood: '🪵', stone: '🪨', coal: '⚫', iron: '⚙️', gold: '🟡', diamond: '💎',
+    dirt: '🟫', grass: '🟩', stone: '🪨', wood: '🪵', leaves: '🍃', brick: '🧱',
+    glass: '🪟', glowstone: '💡', diamond_block: '💠', sand: '🟨', path: '🛤️', flower: '🌸',
+    coal: '⚫', iron: '⚙️', gold: '🟡', diamond: '💎',
     leather: '🧵', sapling: '🌱', raw_meat: '🥩', cooked_meat: '🍖',
     raw_fish: '🐟', cooked_fish: '🍤'
+};
+
+const RESOURCE_NAMES = {
+    dirt: '흙', grass: '잔디', stone: '돌', wood: '나무', leaves: '나뭇잎', brick: '벽돌',
+    glass: '유리', glowstone: '발광석', diamond_block: '다이아 블록', sand: '모래', path: '길', flower: '꽃',
+    coal: '석탄', iron: '철', gold: '금', diamond: '다이아몬드', leather: '가죽', sapling: '묘목'
+};
+
+// Every placeable/minable block type yields its own matching item when broken, so building
+// something with the free creative hotbar and then breaking it back down is never a dead end,
+// and cave/forest resources (wood, stone, ore) always feed the crafting table.
+// NOTE: plain numeric keys on purpose - this is a top-level const evaluated as soon as this
+// script runs, which is BEFORE game.js (where the BLOCK registry is defined) has loaded, so
+// `BLOCK.DIRT`-style computed keys here would throw a ReferenceError. Keep in sync with the
+// BLOCK registry in js/game.js.
+const BLOCK_DROP_MAP = {
+    1: 'dirt',           // BLOCK.DIRT
+    2: 'grass',          // BLOCK.GRASS
+    3: 'stone',          // BLOCK.STONE
+    4: 'wood',           // BLOCK.WOOD
+    5: 'leaves',         // BLOCK.LEAVES
+    6: 'brick',          // BLOCK.BRICK
+    7: 'glass',          // BLOCK.GLASS
+    8: 'glowstone',      // BLOCK.GLOWSTONE
+    9: 'diamond_block',  // BLOCK.DIAMOND_BLOCK
+    21: 'sand',          // BLOCK.SAND
+    22: 'path',          // BLOCK.PATH
+    23: 'coal',          // BLOCK.COAL_ORE
+    24: 'iron',          // BLOCK.IRON_ORE
+    25: 'gold',          // BLOCK.GOLD_ORE
+    26: 'diamond',       // BLOCK.DIAMOND_ORE
+    27: 'sapling',       // BLOCK.SAPLING
+    31: 'stone',         // BLOCK.CAVE_STONE
+    32: 'flower'         // BLOCK.FLOWER
 };
 
 const RECIPES = {
@@ -108,13 +144,10 @@ class InventorySystem {
     }
 
     grantFromBlockBreak(blockType) {
-        if (blockType === BLOCK.WOOD) this.grantResource('wood', 1);
-        else if (blockType === BLOCK.STONE || blockType === BLOCK.CAVE_STONE) this.grantResource('stone', 1);
-        else if (blockType === BLOCK.COAL_ORE) this.grantResource('coal', 1);
-        else if (blockType === BLOCK.IRON_ORE) this.grantResource('iron', 1);
-        else if (blockType === BLOCK.GOLD_ORE) this.grantResource('gold', 1);
-        else if (blockType === BLOCK.DIAMOND_ORE) this.grantResource('diamond', 1);
-        else if (blockType === BLOCK.LEAVES && Math.random() < 0.15) this.grantResource('sapling', 1);
+        const dropKey = BLOCK_DROP_MAP[blockType];
+        if (dropKey) this.grantResource(dropKey, 1);
+        // Bonus chance at an extra sapling on top of the guaranteed leaves drop above
+        if (blockType === BLOCK.LEAVES && Math.random() < 0.15) this.grantResource('sapling', 1);
     }
 
     hasResources(cost) {
@@ -405,7 +438,7 @@ class InventorySystem {
             Object.entries(this.resources).forEach(([key, qty]) => {
                 if (!qty) return;
                 const icon = RESOURCE_ICONS[key] || (RECIPES[key] ? RECIPES[key].icon : '📦');
-                const name = RECIPES[key] ? RECIPES[key].name : (FOODS[key] ? FOODS[key].name : key);
+                const name = RECIPES[key] ? RECIPES[key].name : (FOODS[key] ? FOODS[key].name : (RESOURCE_NAMES[key] || key));
                 const cell = document.createElement('div');
                 cell.className = 'inv-cell';
                 cell.innerHTML = `<div class="inv-icon">${icon}</div><div class="inv-qty">${qty}</div><div class="inv-name">${name}</div>`;

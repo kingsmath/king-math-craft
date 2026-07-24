@@ -147,8 +147,8 @@ class NetworkManager {
                 // Update UI Room Info
                 document.getElementById('login-modal').classList.add('hidden');
                 document.getElementById('game-ui').classList.remove('hidden');
-                document.getElementById('display-room-name').innerText = `방: ${this.username}`;
-                document.getElementById('display-my-number').innerText = `내 번호: ${this.parcelNumber}번`;
+                document.getElementById('display-room-name').innerText = this.username;
+                document.getElementById('display-my-number').innerText = `${this.parcelNumber}번`;
 
                 // Load World Edits from server
                 if (data.world_edits) {
