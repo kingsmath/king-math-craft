@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>👑 킹수학크래프트 - 3D 멀티플레이어</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Three.js 3D Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container">
+        <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- UI Overlay (Game Mode) -->
+    <div id="game-ui" class="hidden">
+        <!-- Crosshair -->
+        <div id="crosshair">+</div>
+
+        <!-- Top Header Bar -->
+        <div id="top-bar">
+            <div id="room-badge" class="glass-panel">
+                <span class="crown-icon">👑</span>
+                <span id="display-room-name">방: 수학방</span>
+                <span class="divider">|</span>
+                <span id="display-my-number" class="highlight">내 번호: 1번</span>
+            </div>
+
+            <!-- Anyone Can Save Map & Download Map Buttons -->
+            <div class="btn-group-top">
+                <button id="btn-save-map" class="btn-save glass-panel" title="서버에 지도 저장">
+                    <span>💾 지도 저장</span>
+                </button>
+                <button id="btn-download-map" class="btn-download glass-panel" title="내 컴퓨터로 지도 파일 다운로드">
+                    <span>📥 지도 다운로드</span>
+                </button>
+            </div>
+
+            <div id="scoreboard" class="glass-panel">
+                <div class="score-header">
+                    <span class="status-dot"></span>
+                    <span>접속자</span>
+                    <span id="player-count-badge" class="badge">1 / 30</span>
+                </div>
+                <ul id="player-list"></ul>
+            </div>
+        </div>
+
+        <!-- Controls Info (Top Left - Traditional Minecraft Controls) -->
+        <div id="controls-info" class="glass-panel">
+            <div class="panel-title">🎮 마인크래프트 전통 조작법</div>
+            <ul>
+                <li><span class="key">WASD</span> 이동 (Ctrl 달리기)</li>
+                <li><span class="key">Space</span> 점프 / <span class="key">Shift</span> 숙이기</li>
+                <li><span class="key">좌클릭</span> 블록 파괴 (부수기)</li>
+                <li><span class="key">우클릭</span> 블록 설치 (놓기)</li>
+                <li><span class="key">1~9</span> / <span class="key">휠</span> 핫바 9슬롯 선택</li>
+                <li><span class="key">F5</span> 시점 변경 (1인칭/3인칭)</li>
+                <li><span class="key">T</span> / <span class="key">Enter</span> 채팅창 열기</li>
+                <li><span class="key">ESC</span> 마우스 커서 해제</li>
+            </ul>
+        </div>
+
+        <!-- Notification Toast Message -->
+        <div id="toast-notify" class="toast hidden"></div>
+
+        <!-- Chat Overlay (Bottom Left) -->
+        <div id="chat-container">
+            <div id="chat-history"></div>
+            <form id="chat-form" class="hidden">
+                <input type="text" id="chat-input" placeholder="메시지를 입력하세요 (Enter 전송)..." maxlength="100" autocomplete="off">
+            </form>
+        </div>
+
+        <!-- Traditional 9-Slot Hotbar (Bottom Center) -->
+        <div id="hotbar" class="glass-panel">
+            <div class="hotbar-slot active" data-slot="1"><span class="slot-num">1</span><div class="icon dirt"></div><span class="slot-name">흙</span></div>
+            <div class="hotbar-slot" data-slot="2"><span class="slot-num">2</span><div class="icon grass"></div><span class="slot-name">잔디</span></div>
+            <div class="hotbar-slot" data-slot="3"><span class="slot-num">3</span><div class="icon stone"></div><span class="slot-name">돌</span></div>
+            <div class="hotbar-slot" data-slot="4"><span class="slot-num">4</span><div class="icon wood"></div><span class="slot-name">나무</span></div>
+            <div class="hotbar-slot" data-slot="5"><span class="slot-num">5</span><div class="icon leaves"></div><span class="slot-name">나뭇잎</span></div>
+            <div class="hotbar-slot" data-slot="6"><span class="slot-num">6</span><div class="icon brick"></div><span class="slot-name">벽돌</span></div>
+            <div class="hotbar-slot" data-slot="7"><span class="slot-num">7</span><div class="icon glass"></div><span class="slot-name">유리</span></div>
+            <div class="hotbar-slot" data-slot="8"><span class="slot-num">8</span><div class="icon glowstone"></div><span class="slot-name">발광석</span></div>
+            <div class="hotbar-slot" data-slot="9"><span class="slot-num">9</span><div class="icon diamond"></div><span class="slot-name">다이아</span></div>
+        </div>
+
+        <!-- Floating Nickname Tags Container -->
+        <div id="nametags-container"></div>
+    </div>
+
+    <!-- Login Modal (Landing Screen - Cleaned Server Address Input) -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="login-card glass-card">
+            <div class="logo-area">
+                <div class="crown-logo">👑</div>
+                <h1>킹수학크래프트</h1>
+                <p class="subtitle">3D 실시간 동시접속 (30일 장기 보존)</p>
+            </div>
+
+            <!-- 30-Day Purge Warning Alert Box -->
+            <div class="purge-warning-box">
+                <span class="warning-icon">📅</span>
+                <div class="warning-text">
+                    <strong>데이터 30일 장기 보존 안내</strong>
+                    <p>마지막 접속 후 <strong>30일 동안 접속하지 않으면</strong> 방 아이디와 지도가 <strong>자동 삭제</strong>됩니다. 지도를 평생 보존하려면 게임 내 <strong>[📥 지도 다운로드]</strong> 버튼을 이용해 주세요!</p>
+                </div>
+            </div>
+
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="username">방 아이디 (ID)</label>
+                    <input type="text" id="username" placeholder="방 아이디를 입력하세요" required autofocus maxlength="15" autocomplete="username">
+                </div>
+
+                <div class="input-group">
+                    <label for="password">비밀번호 (PW)</label>
+                    <input type="password" id="password" placeholder="비밀번호를 입력하세요" required autocomplete="current-password">
+                </div>
+
+                <!-- 1~32 Player Number Grid Selector -->
+                <div class="number-selector-section">
+                    <label class="section-label">몇 번인가요? (개인 땅 1번~32번 선택)</label>
+                    <div id="number-grid" class="number-grid"></div>
+                    <input type="hidden" id="selected-number" value="1">
+                </div>
+
+                <div id="login-error" class="error-msg hidden"></div>
+
+                <button type="submit" id="btn-login" class="btn-primary">
+                    <span>월드 입장하기</span>
+                    <svg class="btn-icon" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </button>
+            </form>
+
+            <div class="server-info-badge">
+                <span class="pulse-dot"></span>
+                <span>방당 인원: <strong>최대 30명</strong> | 중앙 거실 + 32개 개인 땅</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Host Load Map Prompt Modal -->
+    <div id="host-modal" class="modal-overlay hidden">
+        <div class="login-card glass-card">
+            <div class="logo-area">
+                <div class="crown-logo">📜</div>
+                <h2>지도 불러오기</h2>
+                <p class="subtitle">방장(첫 접속자) 전용 권한</p>
+            </div>
+            <div class="modal-body-text">
+                이전에 저장된 지도가 있습니다.<br>저장된 지도를 불러오시겠습니까?
+            </div>
+            <div class="btn-row">
+                <button id="btn-load-yes" class="btn-primary"><span>지도 불러오기</span></button>
+                <button id="btn-load-no" class="btn-secondary"><span>새 지도 시작</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/audio.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/network.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
