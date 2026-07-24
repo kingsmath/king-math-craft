@@ -41,7 +41,7 @@ class PlayerPhysics {
         }
 
         // 4 Corner Regions (Public Living Room)
-        if ((x < -60 && z < -60) or (x > 59 && z < -60) or (x > 59 && z > 59) or (x < -60 && z > 59)) {
+        if ((x < -60 && z < -60) || (x > 59 && z < -60) || (x > 59 && z > 59) || (x < -60 && z > 59)) {
             return 0;
         }
 
