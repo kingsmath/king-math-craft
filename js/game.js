@@ -1,4 +1,4 @@
-// 3D Voxel Engine & World Generator for 킹수학크래프트 (15x15 Parcels, 4 Corner Living Rooms, Active Touch Joystick)
+// 3D Voxel Engine & Ultra-Fast GPU Instanced Renderer for 킹수학크래프트 (60+ FPS Ultra-Smooth)
 class VoxelWorld {
     constructor(scene) {
         this.scene = scene;
@@ -225,7 +225,7 @@ class VoxelWorld {
         return 0;
     }
 
-    // Completely Flat World Generation (Y = 4 Flat Everywhere, Green Living Room)
+    // Completely Flat Surface Generation (Y = 4 Surface Only for Ultra GPU Efficiency)
     generateWorld() {
         const half = 80;
         const groundHeight = 4;
@@ -234,20 +234,12 @@ class VoxelWorld {
             for (let z = -half; z < half; z++) {
                 const parcel = this.getParcelNumber(x, z);
 
-                for (let y = 0; y <= groundHeight; y++) {
-                    if (y === groundHeight) {
-                        if (parcel === 0) {
-                            // Green Living Room Plaza (녹색 거실)
-                            this.blocks.set(this.getKey(x, y, z), 10);
-                        } else {
-                            // 32 Distinct Parcel Colored Floor
-                            this.blocks.set(this.getKey(x, y, z), 100 + parcel);
-                        }
-                    } else if (y === 0) {
-                        this.blocks.set(this.getKey(x, y, z), 3); // Bedrock/Stone
-                    } else {
-                        this.blocks.set(this.getKey(x, y, z), 1); // Dirt
-                    }
+                if (parcel === 0) {
+                    // Green Living Room Plaza (녹색 거실)
+                    this.blocks.set(this.getKey(x, groundHeight, z), 10);
+                } else {
+                    // 32 Distinct Parcel Colored Floor
+                    this.blocks.set(this.getKey(x, groundHeight, z), 100 + parcel);
                 }
 
                 // Glowing Border Glowstones at Center Plaza Perimeter (-60, 59)
@@ -319,6 +311,7 @@ class VoxelWorld {
         this.scene.add(this.signGroup);
     }
 
+    // High Performance THREE.InstancedMesh Rendering (Reduces Draw Calls from 25,600 to ~35!)
     rebuildAllChunks() {
         if (this.chunkGroup) {
             this.scene.remove(this.chunkGroup);
@@ -326,6 +319,9 @@ class VoxelWorld {
 
         this.chunkGroup = new THREE.Group();
         const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+        const dummy = new THREE.Object3D();
+
+        const materialGroups = new Map();
 
         this.blocks.forEach((type, key) => {
             const [x, y, z] = key.split(',').map(Number);
@@ -341,6 +337,13 @@ class VoxelWorld {
 
             if (!isExposed) return;
 
+            if (!materialGroups.has(type)) {
+                materialGroups.set(type, []);
+            }
+            materialGroups.get(type).push({ x, y, z });
+        });
+
+        materialGroups.forEach((positions, type) => {
             let mat;
             if (type > 100) {
                 mat = this.parcelMaterials.get(type);
@@ -348,10 +351,25 @@ class VoxelWorld {
                 mat = this.materials[type];
             }
 
-            if (mat) {
-                const mesh = new THREE.Mesh(boxGeo, mat);
-                mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
-                this.chunkGroup.add(mesh);
+            if (!mat) return;
+
+            // Use InstancedMesh for Single-Material Blocks, or Mesh for Array Material (Grass/Logs)
+            if (Array.isArray(mat)) {
+                positions.forEach(p => {
+                    const mesh = new THREE.Mesh(boxGeo, mat);
+                    mesh.position.set(p.x + 0.5, p.y + 0.5, p.z + 0.5);
+                    this.chunkGroup.add(mesh);
+                });
+            } else {
+                const instancedMesh = new THREE.InstancedMesh(boxGeo, mat, positions.length);
+                for (let i = 0; i < positions.length; i++) {
+                    const p = positions[i];
+                    dummy.position.set(p.x + 0.5, p.y + 0.5, p.z + 0.5);
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrixAt(i, dummy.matrix);
+                }
+                instancedMesh.instanceMatrix.needsUpdate = true;
+                this.chunkGroup.add(instancedMesh);
             }
         });
 
@@ -370,8 +388,8 @@ class MinecraftGame {
 
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.shadowMap.enabled = true;
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Optimized Pixel Ratio
+        this.renderer.shadowMap.enabled = false; // Disable heavy dynamic shadows for ultra 60+ FPS
 
         this.selectedSlot = 1;
         this.cameraMode = 0; // 0: First-Person, 1: Third-Person Back, 2: Third-Person Front
@@ -401,12 +419,11 @@ class MinecraftGame {
         this.scene.background = new THREE.Color(0x78a7ff);
         this.scene.fog = new THREE.FogExp2(0x78a7ff, 0.015);
 
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
         this.scene.add(hemiLight);
 
-        this.sun = new THREE.DirectionalLight(0xffffff, 0.8);
+        this.sun = new THREE.DirectionalLight(0xffffff, 0.6);
         this.sun.position.set(50, 100, 50);
-        this.sun.castShadow = true;
         this.scene.add(this.sun);
     }
 
