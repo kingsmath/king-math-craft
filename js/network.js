@@ -1,48 +1,52 @@
-// WebSocket Network Manager for 킹수학크래프트 (Number PIN Auth Supported)
+// Network Manager - Multiplayer WebSocket & Random Player Clothes Colors
 class NetworkManager {
     constructor(game) {
         this.game = game;
         this.ws = null;
-        this.connected = false;
-        this.sessionId = null;
-        this.username = "";
-        this.displayName = "";
-        this.playerNumber = 1;
-        this.isHost = false;
-        this.otherPlayers = new Map();
+        this.remotePlayers = new Map();
+        this.username = '';
+        this.parcelNumber = 1;
         
-        this.sendStateTimer = null;
+        // Dynamic WebSocket protocol matching current host
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        this.serverUrl = `${protocol}//${window.location.host}`;
+
+        // Available Vibrant Shirt Colors for Random Avatar Clothes
+        this.shirtColors = [
+            0xef4444, 0xf97316, 0xf59e0b, 0x84cc16, 0x10b981, 0x06b6d4,
+            0x3b82f6, 0x6366f1, 0x8b5cf6, 0xd946ef, 0xec4899, 0x14b8a6,
+            0x0284c7, 0x7c3aed, 0xdb2777, 0xe11d48, 0x059669, 0xd97706
+        ];
     }
 
-    connect(username, password, parcelPin, playerNumber, customServerUrl = "") {
+    connect(username, password, parcelPin, playerNum) {
         this.username = username;
-        this.playerNumber = playerNumber;
-        
-        let wsUrl = customServerUrl ? customServerUrl.trim() : "";
+        this.parcelNumber = playerNum;
+        this.game.physics.playerNumber = playerNum;
 
-        if (!wsUrl) {
-            // Default Render Production Server WebSocket Address
-            wsUrl = "wss://king-math-craft.onrender.com/ws";
+        document.getElementById('login-error').classList.add('hidden');
+        const loginBtn = document.getElementById('btn-login');
+        if (loginBtn) {
+            loginBtn.innerText = '서버 연결 중...';
+            loginBtn.disabled = true;
         }
 
-        if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
-            const isSecure = window.location.protocol === 'https:' || wsUrl.includes('onrender.com');
-            const scheme = isSecure ? 'wss:' : 'ws:';
-            wsUrl = `${scheme}//${wsUrl.replace(/^https?:\/\//, '')}`;
+        try {
+            this.ws = new WebSocket(this.serverUrl);
+        } catch (e) {
+            this.showLoginError('서버 연결 실패: ' + e.message);
+            return;
         }
-
-        console.log(`[NET] Connecting to WebSocket server: ${wsUrl}`);
-        this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
-            console.log('[NET] Connected to server. Sending login request...');
-            this.ws.send(JSON.stringify({
-                type: 'login',
-                username: username,
+            console.log('[Network] Connected to server.');
+            this.send({
+                type: 'join',
+                room_id: username, // Using username as room_id
                 password: password,
-                parcelPin: parcelPin,
-                playerNumber: playerNumber
-            }));
+                parcel_pin: parcelPin,
+                parcel_num: playerNum
+            });
         };
 
         this.ws.onmessage = (event) => {
@@ -50,310 +54,277 @@ class NetworkManager {
                 const data = JSON.parse(event.data);
                 this.handleMessage(data);
             } catch (err) {
-                console.error('[NET] Message parse error:', err);
+                console.error('[Network] Message parse error:', err);
             }
         };
 
         this.ws.onerror = (err) => {
-            console.error('[NET] WebSocket error:', err);
-            this.showError('서버 연결 실패 (게임 서버 연결을 확인하세요)');
+            console.error('[Network] WebSocket Error:', err);
+            this.showLoginError('서버에 연결할 수 없습니다.');
         };
 
         this.ws.onclose = () => {
-            console.log('[NET] Disconnected from server.');
-            this.connected = false;
-            if (this.sendStateTimer) clearInterval(this.sendStateTimer);
+            console.log('[Network] Connection closed.');
+            this.game.showToast('⚠️ 서버와의 연결이 끊어졌습니다.');
         };
     }
 
-    handleMessage(data) {
-        switch (data.type) {
-            case 'login_res':
-                if (data.success) {
-                    this.connected = true;
-                    this.sessionId = data.session_id;
-                    this.displayName = data.display_name;
-                    this.playerNumber = data.player_number;
-                    this.isHost = data.is_host;
-
-                    this.game.physics.playerNumber = this.playerNumber;
-
-                    document.getElementById('display-room-name').innerText = `방: ${data.room_id}`;
-                    document.getElementById('display-my-number').innerText = `내 번호: ${this.playerNumber}번`;
-
-                    document.getElementById('login-modal').classList.add('hidden');
-                    document.getElementById('game-ui').classList.remove('hidden');
-
-                    if (data.world_edits) {
-                        for (const [key, blockType] of Object.entries(data.world_edits)) {
-                            const [x, y, z] = key.split(',').map(Number);
-                            this.game.world.setBlock(x, y, z, blockType, false);
-                        }
-                        this.game.world.rebuildAllChunks();
-                    }
-
-                    if (data.existing_players) {
-                        data.existing_players.forEach(p => this.addRemotePlayer(p));
-                    }
-
-                    if (data.prompt_host_load) {
-                        this.game.showHostLoadModal();
-                    } else {
-                        this.game.start();
-                    }
-
-                    this.sendStateTimer = setInterval(() => this.sendPlayerState(), 33);
-                } else {
-                    this.showError(data.message || '로그인에 실패했습니다.');
-                }
-                break;
-
-            case 'reload_world_edits':
-                if (data.world_edits) {
-                    for (const [key, blockType] of Object.entries(data.world_edits)) {
-                        const [x, y, z] = key.split(',').map(Number);
-                        this.game.world.setBlock(x, y, z, blockType, false);
-                    }
-                    this.game.world.rebuildAllChunks();
-                    if (data.msg) this.game.showToast(`📜 ${data.msg}`);
-                }
-                break;
-
-            case 'map_saved_notify':
-                if (data.msg) this.game.showToast(`💾 ${data.msg}`);
-                break;
-
-            case 'block_denied':
-                if (data.message) this.game.showToast(`⛔ ${data.message}`);
-                break;
-
-            case 'player_joined':
-                if (data.player && data.player.id !== this.sessionId) {
-                    this.addRemotePlayer(data.player);
-                    this.game.addChatMessage('시스템', `${data.player.display_name}님이 입장에 성공했습니다.`);
-                }
-                break;
-
-            case 'player_left':
-                this.removeRemotePlayer(data.id, data.display_name);
-                break;
-
-            case 'player_moved':
-                if (data.id !== this.sessionId && this.otherPlayers.has(data.id)) {
-                    const p = this.otherPlayers.get(data.id);
-                    p.targetPos.set(data.x, data.y, data.z);
-                    p.targetRotY = data.rotY;
-                    p.isMoving = data.isMoving;
-                }
-                break;
-
-            case 'block_changed':
-                this.game.world.setBlock(data.x, data.y, data.z, data.blockType, true);
-                if (data.blockType === 0) sfx.playBlockBreak();
-                else sfx.playBlockPlace();
-                break;
-
-            case 'chat_msg':
-                this.game.addChatMessage(data.sender, data.text);
-                break;
-
-            case 'player_count':
-                const badge = document.getElementById('player-count-badge');
-                if (badge) badge.innerText = `${data.count} / ${data.max}`;
-                break;
+    send(data) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify(data));
         }
     }
 
-    sendHostLoadDecision(load) {
-        if (!this.connected || !this.ws) return;
-        this.ws.send(JSON.stringify({
-            type: 'host_load_decision',
-            load: load
-        }));
-    }
-
-    sendSaveMapRequest() {
-        if (!this.connected || !this.ws) return;
-        this.ws.send(JSON.stringify({
-            type: 'save_map'
-        }));
-    }
-
-    sendPlayerState() {
-        if (!this.connected || !this.ws) return;
-
-        const physics = this.game.physics;
-        this.ws.send(JSON.stringify({
-            type: 'player_state',
-            x: physics.position.x,
-            y: physics.position.y,
-            z: physics.position.z,
-            rotX: physics.rotation.x,
-            rotY: physics.rotation.y,
-            isMoving: physics.velocity.lengthSq() > 0.1,
-            selectedSlot: this.game.selectedSlot
-        }));
-    }
-
-    sendBlockChange(x, y, z, blockType) {
-        if (!this.connected || !this.ws) return;
-        this.ws.send(JSON.stringify({
-            type: 'block_change',
-            x: x,
-            y: y,
-            z: z,
-            blockType: blockType
-        }));
-    }
-
-    sendChatMessage(text) {
-        if (!this.connected || !this.ws) return;
-        this.ws.send(JSON.stringify({
-            type: 'chat',
-            text: text
-        }));
-    }
-
-    addRemotePlayer(playerData) {
-        const group = new THREE.Group();
-
-        const shirtMat = new THREE.MeshLambertMaterial({ color: 0x00a8a8 });
-        const pantsMat = new THREE.MeshLambertMaterial({ color: 0x000080 });
-        const skinMat = new THREE.MeshLambertMaterial({ color: 0xffdbac });
-
-        const headGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-        const headMesh = new THREE.Mesh(headGeo, skinMat);
-        headMesh.position.y = 1.5;
-        group.add(headMesh);
-
-        const bodyGeo = new THREE.BoxGeometry(0.4, 0.6, 0.2);
-        const bodyMesh = new THREE.Mesh(bodyGeo, shirtMat);
-        bodyMesh.position.y = 1.0;
-        group.add(bodyMesh);
-
-        const armGeo = new THREE.BoxGeometry(0.16, 0.6, 0.16);
-        const leftArm = new THREE.Mesh(armGeo, shirtMat);
-        leftArm.position.set(-0.3, 1.0, 0);
-        group.add(leftArm);
-
-        const rightArm = new THREE.Mesh(armGeo, shirtMat);
-        rightArm.position.set(0.3, 1.0, 0);
-        group.add(rightArm);
-
-        const legGeo = new THREE.BoxGeometry(0.18, 0.6, 0.18);
-        const leftLeg = new THREE.Mesh(legGeo, pantsMat);
-        leftLeg.position.set(-0.1, 0.4, 0);
-        group.add(leftLeg);
-
-        const rightLeg = new THREE.Mesh(legGeo, pantsMat);
-        rightLeg.position.set(0.1, 0.4, 0);
-        group.add(rightLeg);
-
-        group.position.set(playerData.x, playerData.y, playerData.z);
-        this.game.scene.add(group);
-
-        const nametag = document.createElement('div');
-        nametag.className = 'player-nametag';
-        nametag.innerText = playerData.display_name;
-        nametag.style.position = 'absolute';
-        nametag.style.color = '#f59e0b';
-        nametag.style.fontSize = '12px';
-        nametag.style.fontWeight = 'bold';
-        nametag.style.textShadow = '0 0 4px #000';
-        nametag.style.background = 'rgba(15, 23, 42, 0.8)';
-        nametag.style.padding = '3px 8px';
-        nametag.style.borderRadius = '6px';
-        nametag.style.border = '1px solid rgba(245, 158, 11, 0.5)';
-        nametag.style.pointerEvents = 'none';
-
-        document.getElementById('nametags-container').appendChild(nametag);
-
-        this.otherPlayers.set(playerData.id, {
-            mesh: group,
-            leftArm, rightArm, leftLeg, rightLeg,
-            nametag: nametag,
-            targetPos: new THREE.Vector3(playerData.x, playerData.y, playerData.z),
-            targetRotY: playerData.rotY || 0,
-            isMoving: false,
-            animTime: 0,
-            displayName: playerData.display_name
-        });
-
-        this.updatePlayerList();
-    }
-
-    removeRemotePlayer(id, displayName) {
-        if (this.otherPlayers.has(id)) {
-            const p = this.otherPlayers.get(id);
-            this.game.scene.remove(p.mesh);
-            if (p.nametag && p.nametag.parentNode) {
-                p.nametag.parentNode.removeChild(p.nametag);
-            }
-            this.otherPlayers.delete(id);
-            this.updatePlayerList();
-
-            this.game.addChatMessage('시스템', `${displayName}님이 퇴장하셨습니다.`);
-        }
-    }
-
-    updateRemotePlayers(delta) {
-        const camera = this.game.camera;
-
-        this.otherPlayers.forEach((p, id) => {
-            p.mesh.position.lerp(p.targetPos, delta * 15.0);
-            p.mesh.rotation.y = p.targetRotY;
-
-            if (p.isMoving) {
-                p.animTime += delta * 10;
-                const angle = Math.sin(p.animTime) * 0.6;
-                p.leftArm.rotation.x = angle;
-                p.rightArm.rotation.x = -angle;
-                p.leftLeg.rotation.x = -angle;
-                p.rightLeg.rotation.x = angle;
-            } else {
-                p.leftArm.rotation.x = 0;
-                p.rightArm.rotation.x = 0;
-                p.leftLeg.rotation.x = 0;
-                p.rightLeg.rotation.x = 0;
-            }
-
-            const headPos = p.mesh.position.clone();
-            headPos.y += 2.0;
-            headPos.project(camera);
-
-            if (headPos.z < 1.0) {
-                const x = (headPos.x * 0.5 + 0.5) * window.innerWidth;
-                const y = (-(headPos.y * 0.5) + 0.5) * window.innerHeight;
-                p.nametag.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
-                p.nametag.style.display = 'block';
-            } else {
-                p.nametag.style.display = 'none';
-            }
-        });
-    }
-
-    updatePlayerList() {
-        const ul = document.getElementById('player-list');
-        if (!ul) return;
-        ul.innerHTML = '';
-
-        const selfLi = document.createElement('li');
-        selfLi.className = 'self';
-        selfLi.innerText = `🟢 ${this.displayName || '나'}`;
-        ul.appendChild(selfLi);
-
-        this.otherPlayers.forEach(p => {
-            const li = document.createElement('li');
-            li.innerText = `👤 ${p.displayName}`;
-            ul.appendChild(li);
-        });
-    }
-
-    showError(msg) {
+    showLoginError(msg) {
         const errDiv = document.getElementById('login-error');
+        const loginBtn = document.getElementById('btn-login');
         if (errDiv) {
             errDiv.innerText = msg;
             errDiv.classList.remove('hidden');
         }
+        if (loginBtn) {
+            loginBtn.innerText = '월드 입장하기';
+            loginBtn.disabled = false;
+        }
+    }
+
+    handleMessage(data) {
+        switch (data.type) {
+            case 'init':
+                console.log('[Network] Joined successfully as player ID:', data.id);
+                this.myId = data.id;
+
+                // Update UI Room Info
+                document.getElementById('login-modal').classList.add('hidden');
+                document.getElementById('game-ui').classList.remove('hidden');
+                document.getElementById('display-room-name').innerText = `방: ${this.username}`;
+                document.getElementById('display-my-number').innerText = `내 번호: ${this.parcelNumber}번`;
+
+                // If existing blocks sent from server
+                if (data.blocks) {
+                    Object.entries(data.blocks).forEach(([key, type]) => {
+                        const [x, y, z] = key.split(',').map(Number);
+                        this.game.world.setBlock(x, y, z, type, false);
+                    });
+                    this.game.world.rebuildAllChunks();
+                }
+
+                // If host map load prompt required
+                if (data.is_host && data.has_saved_map) {
+                    this.game.showHostLoadModal();
+                } else {
+                    this.game.start();
+                }
+                break;
+
+            case 'error':
+                this.showLoginError(data.message);
+                break;
+
+            case 'player_joined':
+                this.game.showToast(`🎮 [${data.player.parcel_num}번] 님이 입장하셨습니다!`);
+                break;
+
+            case 'player_left':
+                this.game.showToast(`🚪 [${data.id}] 님이 퇴장하셨습니다.`);
+                this.removeRemotePlayer(data.id);
+                break;
+
+            case 'world_state':
+                this.updateWorldState(data.players);
+                break;
+
+            case 'block_change':
+                this.game.world.setBlock(data.x, data.y, data.z, data.block_type);
+                if (data.block_type === 0) sfx.playBreak();
+                else sfx.playPlace();
+                break;
+
+            case 'chat':
+                this.game.addChatMessage(data.sender, data.text);
+                break;
+        }
+    }
+
+    sendBlockChange(x, y, z, blockType) {
+        // Enforce Parcel Ownership Rule
+        const targetParcel = this.game.world.getParcelNumber(x, z);
+
+        if (targetParcel !== 0 && targetParcel !== this.parcelNumber) {
+            this.game.showToast(`⛔ [${targetParcel}번 땅] 남의 땅에는 블록을 설치/파괴할 수 없습니다!`);
+            return;
+        }
+
+        // Local instant update
+        this.game.world.setBlock(x, y, z, blockType);
+
+        // Send to server
+        this.send({
+            type: 'block_change',
+            x: x,
+            y: y,
+            z: z,
+            block_type: blockType
+        });
+
+        if (blockType === 0) sfx.playBreak();
+        else sfx.playPlace();
+    }
+
+    sendSaveMapRequest() {
+        const roomName = this.username || '수학방';
+        const blocksObj = Object.fromEntries(this.game.world.blocks);
+        this.send({
+            type: 'save_map',
+            room_id: roomName,
+            blocks: blocksObj
+        });
+        this.game.showToast(`💾 [${roomName}] 지도가 클라우드 서버에 안전하게 저장되었습니다!`);
+    }
+
+    sendHostLoadDecision(loadSavedMap) {
+        this.send({
+            type: 'host_load_decision',
+            load_saved_map: loadSavedMap
+        });
+    }
+
+    sendChatMessage(text) {
+        this.send({
+            type: 'chat',
+            text: text
+        });
+    }
+
+    sendPosition() {
+        if (!this.myId) return;
+        const pos = this.game.physics.position;
+        const rot = this.game.physics.rotation;
+        this.send({
+            type: 'move',
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+            rx: rot.x,
+            ry: rot.y
+        });
+    }
+
+    // Render Remote 3D Player Avatars with Random Clothes Colors
+    updateWorldState(playersData) {
+        const activeIds = new Set();
+        let currentPlayersCount = 1; // Including local player
+
+        Object.entries(playersData).forEach(([id, pData]) => {
+            if (id === this.myId) return;
+            activeIds.add(id);
+            currentPlayersCount++;
+
+            if (!this.remotePlayers.has(id)) {
+                const meshGroup = this.createPlayerMesh(pData.parcel_num || 1, id);
+                this.game.scene.add(meshGroup);
+                this.remotePlayers.set(id, {
+                    group: meshGroup,
+                    targetPos: new THREE.Vector3(pData.x, pData.y, pData.z),
+                    targetRotY: pData.ry || 0
+                });
+            } else {
+                const rp = this.remotePlayers.get(id);
+                rp.targetPos.set(pData.x, pData.y, pData.z);
+                rp.targetRotY = pData.ry || 0;
+            }
+        });
+
+        // Update Scoreboard Count
+        const countBadge = document.getElementById('player-count-badge');
+        if (countBadge) countBadge.innerText = `${currentPlayersCount} / 32`;
+
+        // Remove disconnected players
+        this.remotePlayers.forEach((rp, id) => {
+            if (!activeIds.has(id)) {
+                this.game.scene.remove(rp.group);
+                this.remotePlayers.delete(id);
+            }
+        });
+    }
+
+    // Create 3D Minecraft Humanoid Character with Random Clothes Color
+    createPlayerMesh(parcelNum, id) {
+        const group = new THREE.Group();
+
+        // Pick Random Shirt Color for Clothes based on Player ID / Parcel Number
+        const colorIndex = (typeof id === 'string' ? id.charCodeAt(id.length - 1) : parcelNum) % this.shirtColors.length;
+        const shirtColor = this.shirtColors[colorIndex];
+        const pantsColor = 0x1e3a8a; // Dark Blue Jeans
+
+        // Head
+        const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.position.y = 1.5;
+        group.add(head);
+
+        // Body (Shirt with Random Color!)
+        const bodyGeo = new THREE.BoxGeometry(0.5, 0.7, 0.3);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: shirtColor });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.y = 0.9;
+        group.add(body);
+
+        // Legs (Pants)
+        const legGeo = new THREE.BoxGeometry(0.22, 0.65, 0.22);
+        const legMat = new THREE.MeshStandardMaterial({ color: pantsColor });
+        const leftLeg = new THREE.Mesh(legGeo, legMat);
+        leftLeg.position.set(-0.13, 0.325, 0);
+        const rightLeg = new THREE.Mesh(legGeo, legMat);
+        rightLeg.position.set(0.13, 0.325, 0);
+        group.add(leftLeg);
+        group.add(rightLeg);
+
+        // 3D Nickname Tag above head
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, 0, 256, 64);
+        ctx.fillStyle = '#fde047';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`🚩 ${parcelNum}번 플레이어`, 128, 32);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const nameMat = new THREE.SpriteMaterial({ map: texture });
+        const nameSprite = new THREE.Sprite(nameMat);
+        nameSprite.position.y = 2.0;
+        nameSprite.scale.set(2, 0.5, 1);
+        group.add(nameSprite);
+
+        return group;
+    }
+
+    removeRemotePlayer(id) {
+        if (this.remotePlayers.has(id)) {
+            const rp = this.remotePlayers.get(id);
+            this.game.scene.remove(rp.group);
+            this.remotePlayers.delete(id);
+        }
+    }
+
+    updateRemotePlayers(delta) {
+        // Send local player position every 50ms
+        const now = performance.now();
+        if (!this.lastSendTime || now - this.lastSendTime > 50) {
+            this.sendPosition();
+            this.lastSendTime = now;
+        }
+
+        // Smooth Lerp Interpolation for Remote Players
+        this.remotePlayers.forEach((rp) => {
+            rp.group.position.lerp(rp.targetPos, delta * 12.0);
+            rp.group.rotation.y = rp.targetRotY;
+        });
     }
 }

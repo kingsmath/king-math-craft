@@ -34,7 +34,7 @@
 
             <!-- Header Action Buttons -->
             <div class="btn-group-top">
-                <button id="btn-toggle-controls" class="btn-controls glass-panel" title="조작법 접기/펴기">
+                <button id="btn-toggle-controls" class="btn-controls glass-panel" title="조작법 켜고 끌기">
                     <span>❓ 조작법</span>
                 </button>
                 <button id="btn-save-map" class="btn-save glass-panel" title="서버에 지도 저장">
@@ -55,17 +55,18 @@
             </div>
         </div>
 
-        <!-- Controls Info (Top Left - Accordion Foldable Panel) -->
-        <div id="controls-info" class="glass-panel collapsed">
-            <div class="panel-header" id="controls-header" title="클릭하여 조작법 접기/펴기">
-                <span class="panel-title">🎮 조작법 <span id="accordion-icon" class="accordion-icon">▼</span></span>
+        <!-- Top Header Controls Dropdown Panel -->
+        <div id="controls-dropdown" class="glass-panel hidden">
+            <div class="dropdown-header">
+                <span class="dropdown-title">🎮 게임 조작법</span>
+                <button id="btn-close-dropdown" class="btn-close">❌ 닫기</button>
             </div>
-            <ul id="controls-list">
+            <ul class="dropdown-controls-list">
                 <li><span class="key">WASD</span> / <span class="key">터치 조이스틱</span> 이동</li>
                 <li><span class="key">Space</span> 점프 / <span class="key">Shift</span> 숙이기</li>
                 <li><span class="key">좌클릭</span> 파괴 / <span class="key">우클릭</span> 설치</li>
                 <li><span class="key">1~9</span> / <span class="key">휠</span> 핫바 9슬롯 선택</li>
-                <li><span class="key">F5</span> 시점 변경 / <span class="key">H</span> 조작법 접기/펴기</li>
+                <li><span class="key">H</span> 조작법 창 열기/닫기</li>
                 <li><span class="key">T</span> / <span class="key">Enter</span> 채팅창 열기</li>
             </ul>
         </div>
@@ -108,7 +109,6 @@
                 <button id="btn-touch-break" class="touch-btn action-btn btn-break">🔨 파괴</button>
                 <button id="btn-touch-place" class="touch-btn action-btn btn-place">🧱 설치</button>
                 <button id="btn-touch-jump" class="touch-btn action-btn btn-jump">⬆️ 점프</button>
-                <button id="btn-touch-cam" class="touch-btn action-btn btn-cam">👁️ 시점</button>
             </div>
         </div>
 

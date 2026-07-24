@@ -392,7 +392,6 @@ class MinecraftGame {
         this.renderer.shadowMap.enabled = false; // Disable heavy dynamic shadows for ultra 60+ FPS
 
         this.selectedSlot = 1;
-        this.cameraMode = 0; // 0: First-Person, 1: Third-Person Back, 2: Third-Person Front
 
         // Touch Drag Camera Vars
         this.touchPreviousX = 0;
@@ -614,15 +613,6 @@ class MinecraftGame {
             jumpBtn.addEventListener('mouseup', jumpRelease);
         }
 
-        // Camera Switch Button (Bottom-Right)
-        const camBtn = document.getElementById('btn-touch-cam');
-        if (camBtn) {
-            camBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.cameraMode = (this.cameraMode + 1) % 3;
-            });
-        }
-
         // Touch Drag for Camera Rotation on Canvas
         this.canvas.addEventListener('touchstart', (e) => {
             if (e.touches.length > 0) {
@@ -659,27 +649,27 @@ class MinecraftGame {
             this.renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Accordion Fold/Unfold Controls Info Event Handlers
+        // Controls Dropdown Toggle & Close Handlers (Top Header Area)
         const toggleControlsBtn = document.getElementById('btn-toggle-controls');
-        const controlsHeader = document.getElementById('controls-header');
-        const controlsInfo = document.getElementById('controls-info');
+        const closeDropdownBtn = document.getElementById('btn-close-dropdown');
+        const controlsDropdown = document.getElementById('controls-dropdown');
 
-        const toggleAccordion = () => {
-            if (controlsInfo) {
-                controlsInfo.classList.toggle('collapsed');
+        const toggleDropdown = () => {
+            if (controlsDropdown) {
+                controlsDropdown.classList.toggle('hidden');
             }
         };
 
         if (toggleControlsBtn) {
             toggleControlsBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                toggleAccordion();
+                toggleDropdown();
             });
         }
-        if (controlsHeader) {
-            controlsHeader.addEventListener('click', (e) => {
+        if (closeDropdownBtn) {
+            closeDropdownBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                toggleAccordion();
+                toggleDropdown();
             });
         }
 
@@ -708,14 +698,9 @@ class MinecraftGame {
                 this.selectSlot(parseInt(e.key));
             }
 
-            if (e.code === 'F5') {
-                e.preventDefault();
-                this.cameraMode = (this.cameraMode + 1) % 3;
-            }
-
-            // 'H' key toggles/folds controls overlay
+            // 'H' key toggles controls dropdown overlay
             if (e.code === 'KeyH') {
-                toggleAccordion();
+                toggleDropdown();
             }
 
             if (e.code === 'KeyT' || e.code === 'Enter') {
@@ -915,25 +900,10 @@ class MinecraftGame {
 
         this.camera.rotation.order = 'YXZ';
 
-        if (this.cameraMode === 0) {
-            // First-Person View
-            this.camera.position.copy(eyePos);
-            this.camera.rotation.y = this.physics.rotation.y;
-            this.camera.rotation.x = this.physics.rotation.x;
-        } else if (this.cameraMode === 1) {
-            // Third-Person Back View
-            const lookDir = this.physics.getLookVector();
-            const camPos = eyePos.clone().sub(lookDir.clone().multiplyScalar(4.0));
-            this.camera.position.copy(camPos);
-            this.camera.rotation.y = this.physics.rotation.y;
-            this.camera.rotation.x = this.physics.rotation.x;
-        } else if (this.cameraMode === 2) {
-            // Third-Person Front View
-            const lookDir = this.physics.getLookVector();
-            const camPos = eyePos.clone().add(lookDir.clone().multiplyScalar(4.0));
-            this.camera.position.copy(camPos);
-            this.camera.lookAt(eyePos);
-        }
+        // Locked to First-Person View (Human Perspective)
+        this.camera.position.copy(eyePos);
+        this.camera.rotation.y = this.physics.rotation.y;
+        this.camera.rotation.x = this.physics.rotation.x;
 
         const target = this.physics.raycastTarget(6.0);
         if (target.hit) {
