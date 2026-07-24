@@ -1,4 +1,4 @@
-// 3D Voxel Engine & World Generator for 킹수학크래프트 (15x15 Parcels, 4 Corner Living Rooms, Touch Controller)
+// 3D Voxel Engine & World Generator for 킹수학크래프트 (15x15 Parcels, 4 Corner Living Rooms, Active Touch Joystick)
 class VoxelWorld {
     constructor(scene) {
         this.scene = scene;
@@ -394,7 +394,7 @@ class MinecraftGame {
         this.initLighting();
         this.initNumberGridSelector();
         this.initEventListeners();
-        this.initTouchControls();
+        this.initActiveTouchJoystick();
     }
 
     initLighting() {
@@ -432,45 +432,111 @@ class MinecraftGame {
         }
     }
 
-    initTouchControls() {
-        const bindButton = (id, keyName) => {
-            const btn = document.getElementById(id);
-            if (!btn) return;
+    // Active Movable Dynamic Touch Joystick Implementation
+    initActiveTouchJoystick() {
+        const container = document.getElementById('joystick-container');
+        const knob = document.getElementById('joystick-knob');
+        if (!container || !knob) return;
 
-            const press = (e) => {
-                e.preventDefault();
-                this.physics.keys[keyName] = true;
-                btn.classList.add('active');
-            };
+        let activeTouchId = null;
+        let baseRect = null;
+        let centerX = 0;
+        let centerY = 0;
+        const maxRadius = 45; // Max knob drag radius in pixels
 
-            const release = (e) => {
-                e.preventDefault();
-                this.physics.keys[keyName] = false;
-                btn.classList.remove('active');
-            };
+        const handleStart = (e) => {
+            if (activeTouchId !== null) return;
+            const touch = e.changedTouches ? e.changedTouches[0] : e;
+            activeTouchId = touch.identifier !== undefined ? touch.identifier : 'mouse';
+            
+            baseRect = container.getBoundingClientRect();
+            centerX = baseRect.left + baseRect.width / 2;
+            centerY = baseRect.top + baseRect.height / 2;
 
-            btn.addEventListener('touchstart', press);
-            btn.addEventListener('touchend', release);
-            btn.addEventListener('mousedown', press);
-            btn.addEventListener('mouseup', release);
-            btn.addEventListener('mouseleave', release);
+            handleMove(e);
         };
 
-        bindButton('btn-touch-up', 'forward');
-        bindButton('btn-touch-down', 'backward');
-        bindButton('btn-touch-left', 'left');
-        bindButton('btn-touch-right', 'right');
-        bindButton('btn-touch-jump', 'jump');
+        const handleMove = (e) => {
+            if (activeTouchId === null) return;
 
-        // Sprint Toggle Button
-        const sprintBtn = document.getElementById('btn-touch-sprint');
-        if (sprintBtn) {
-            sprintBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.physics.keys.sprint = !this.physics.keys.sprint;
-                sprintBtn.classList.toggle('active', this.physics.keys.sprint);
-            });
-        }
+            let touch = null;
+            if (e.changedTouches) {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === activeTouchId) {
+                        touch = e.changedTouches[i];
+                        break;
+                    }
+                }
+            } else {
+                touch = e;
+            }
+
+            if (!touch) return;
+
+            const dx = touch.clientX - centerX;
+            const dy = touch.clientY - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            let clampedX = dx;
+            let clampedY = dy;
+
+            if (dist > maxRadius) {
+                clampedX = (dx / dist) * maxRadius;
+                clampedY = (dy / dist) * maxRadius;
+            }
+
+            knob.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+
+            const normX = clampedX / maxRadius;
+            const normY = clampedY / maxRadius;
+
+            const deadZone = 0.18;
+            this.physics.keys.forward = normY < -deadZone;
+            this.physics.keys.backward = normY > deadZone;
+            this.physics.keys.right = normX > deadZone;
+            this.physics.keys.left = normX < -deadZone;
+
+            // Auto Sprint if pushed past 80% radius
+            this.physics.keys.sprint = dist / maxRadius > 0.8;
+        };
+
+        const handleEnd = (e) => {
+            if (activeTouchId === null) return;
+
+            if (e.changedTouches) {
+                let matched = false;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === activeTouchId) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) return;
+            }
+
+            activeTouchId = null;
+            knob.style.transform = `translate(0px, 0px)`;
+
+            this.physics.keys.forward = false;
+            this.physics.keys.backward = false;
+            this.physics.keys.left = false;
+            this.physics.keys.right = false;
+            this.physics.keys.sprint = false;
+        };
+
+        container.addEventListener('touchstart', handleStart);
+        window.addEventListener('touchmove', handleMove);
+        window.addEventListener('touchend', handleEnd);
+        window.addEventListener('touchcancel', handleEnd);
+
+        // Desktop mouse support for testing active joystick
+        container.addEventListener('mousedown', handleStart);
+        window.addEventListener('mousemove', (e) => {
+            if (activeTouchId === 'mouse') handleMove(e);
+        });
+        window.addEventListener('mouseup', (e) => {
+            if (activeTouchId === 'mouse') handleEnd(e);
+        });
 
         // Break Block Button
         const breakBtn = document.getElementById('btn-touch-break');
@@ -496,6 +562,23 @@ class MinecraftGame {
                     this.net.sendBlockChange(x, y, z, this.selectedSlot);
                 }
             });
+        }
+
+        // Jump Button
+        const jumpBtn = document.getElementById('btn-touch-jump');
+        if (jumpBtn) {
+            const jumpPress = (e) => {
+                e.preventDefault();
+                this.physics.keys.jump = true;
+            };
+            const jumpRelease = (e) => {
+                e.preventDefault();
+                this.physics.keys.jump = false;
+            };
+            jumpBtn.addEventListener('touchstart', jumpPress);
+            jumpBtn.addEventListener('touchend', jumpRelease);
+            jumpBtn.addEventListener('mousedown', jumpPress);
+            jumpBtn.addEventListener('mouseup', jumpRelease);
         }
 
         // Camera Switch Button

@@ -56,7 +56,7 @@
         <div id="controls-info" class="glass-panel">
             <div class="panel-title">🎮 마인크래프트 조작법 (15x15 개인땅)</div>
             <ul>
-                <li><span class="key">WASD</span> / <span class="key">터치버튼</span> 이동</li>
+                <li><span class="key">WASD</span> / <span class="key">터치 조이스틱</span> 이동</li>
                 <li><span class="key">Space</span> 점프 / <span class="key">Shift</span> 숙이기</li>
                 <li><span class="key">좌클릭</span> 파괴 / <span class="key">우클릭</span> 설치</li>
                 <li><span class="key">1~9</span> / <span class="key">휠</span> 핫바 9슬롯 선택</li>
@@ -90,18 +90,16 @@
             <div class="hotbar-slot" data-slot="9"><span class="slot-num">9</span><div class="icon diamond"></div><span class="slot-name">다이아</span></div>
         </div>
 
-        <!-- Mobile & Tablet Touch Controls Overlay -->
+        <!-- Mobile & Tablet Active Dynamic Touch Joystick Controls Overlay -->
         <div id="touch-controls">
-            <div id="touch-dpad">
-                <button id="btn-touch-up" class="touch-btn">▲</button>
-                <div class="touch-row">
-                    <button id="btn-touch-left" class="touch-btn">◀</button>
-                    <button id="btn-touch-sprint" class="touch-btn btn-sprint">🏃</button>
-                    <button id="btn-touch-right" class="touch-btn">▶</button>
+            <!-- Active Movable Touch Joystick -->
+            <div id="joystick-container">
+                <div id="joystick-base">
+                    <div id="joystick-knob"></div>
                 </div>
-                <button id="btn-touch-down" class="touch-btn">▼</button>
             </div>
 
+            <!-- Action Touch Buttons -->
             <div id="touch-actions">
                 <button id="btn-touch-break" class="touch-btn action-btn btn-break">🔨 파괴</button>
                 <button id="btn-touch-place" class="touch-btn action-btn btn-place">🧱 설치</button>
@@ -120,15 +118,19 @@
             <div class="logo-area">
                 <div class="crown-logo">👑</div>
                 <h1>킹수학크래프트</h1>
-                <p class="subtitle">3D 실시간 동시접속 (15x15 대형 개인땅 + 모바일지원)</p>
+                <p class="subtitle">3D 실시간 동시접속 (액티브 터치 조이스틱 지원)</p>
             </div>
 
-            <!-- First-Come First-Served & 30-Day Alert Box -->
+            <!-- First-Come First-Served Ownership Detailed Guide Alert Box -->
             <div class="purge-warning-box">
                 <span class="warning-icon">📢</span>
                 <div class="warning-text">
                     <strong>회원가입 없는 선점 방식 안내 (먼저 만든 사람이 임자!)</strong>
-                    <p>별도의 회원가입 없이 <strong>아이디와 비밀번호를 먼저 만드는 사람이 주인이 됩니다!</strong> 설정한 방 비밀번호와 번호 비밀번호를 꼭 기억해주세요. (30일 보존)</p>
+                    <ul class="login-guide-list">
+                        <li>🔑 <strong>방 아이디 & 방 비밀번호</strong>: 원하는 방 이름을 먼저 만든 사람이 해당 방의 주인이 됩니다.</li>
+                        <li>🚩 <strong>선택한 번호 비밀번호</strong>: 1번~32번 땅 중 원하는 번호를 먼저 비밀번호로 설정하면 본인 전용 땅이 됩니다.</li>
+                        <li>⚠️ 별도의 회원가입이 없으므로, <strong>본인이 설정한 비밀번호를 꼭 기억해주세요!</strong> (30일 보존)</li>
+                    </ul>
                 </div>
             </div>
 
