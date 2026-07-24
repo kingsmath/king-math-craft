@@ -160,36 +160,14 @@ class EntityManager {
             group.userData.legs = legs;
         } else {
             // zombie / skeleton: humanoid like the player mesh
-        if (type === 'cow' || type === 'pig' || type === 'bear') {
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 1.2), clothMat);
-            body.position.y = 0.7;
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
-            head.position.set(0, 1.1, 0.7);
-            group.add(body, head);
-            const legMat = new THREE.MeshStandardMaterial({ color: 0x27272a });
-            const fl = createLimbPivotMesh(0.22, 0.6, 0.22, legMat, -0.3, 0.6, 0.4);
-            const fr = createLimbPivotMesh(0.22, 0.6, 0.22, legMat, 0.3, 0.6, 0.4);
-            const bl = createLimbPivotMesh(0.22, 0.6, 0.22, legMat, -0.3, 0.6, -0.4);
-            const br = createLimbPivotMesh(0.22, 0.6, 0.22, legMat, 0.3, 0.6, -0.4);
-            group.add(fl, fr, bl, br);
-            group.userData.legs = [fl, fr, bl, br];
-        } else if (type === 'chicken') {
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.5), skinMat);
-            body.position.y = 0.4;
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 0.25), clothMat);
-            head.position.set(0, 0.65, 0.2);
-            group.add(body, head);
-            const legMat = new THREE.MeshStandardMaterial({ color: 0xd97706 });
-            const fl = createLimbPivotMesh(0.08, 0.3, 0.08, legMat, -0.1, 0.3, 0);
-            const fr = createLimbPivotMesh(0.08, 0.3, 0.08, legMat, 0.1, 0.3, 0);
-            group.add(fl, fr);
-            group.userData.legs = [fl, fr];
-        } else {
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.75, 0.3), clothMat);
-            body.position.y = 1.275;
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
-            head.position.y = 1.9;
-            group.add(body, head);
+            const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+            const head = new THREE.Mesh(headGeo, skinMat);
+            head.position.y = 1.5;
+            group.add(head);
+            const bodyGeo = new THREE.BoxGeometry(0.5, 0.7, 0.3);
+            const body = new THREE.Mesh(bodyGeo, clothMat);
+            body.position.y = 0.9;
+            group.add(body);
             const leftArm = createLimbPivotMesh(0.2, 0.65, 0.2, skinMat, -0.35, 1.245, 0);
             const rightArm = createLimbPivotMesh(0.2, 0.65, 0.2, skinMat, 0.35, 1.245, 0);
             group.add(leftArm, rightArm);

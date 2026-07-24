@@ -70,7 +70,8 @@ class NetworkManager {
         document.getElementById('login-error').classList.add('hidden');
         const loginBtn = document.getElementById('btn-login');
         if (loginBtn) {
-            loginBtn.innerText = '서버 연결 중...';
+            const label = loginBtn.querySelector('span');
+            if (label) label.innerText = '서버 연결 중...'; else loginBtn.innerText = '서버 연결 중...';
             loginBtn.disabled = true;
         }
 
@@ -130,7 +131,8 @@ class NetworkManager {
             errDiv.classList.remove('hidden');
         }
         if (loginBtn) {
-            loginBtn.innerText = '월드 입장하기';
+            const label = loginBtn.querySelector('span');
+            if (label) label.innerText = '👑 월드 입장하기'; else loginBtn.innerText = '월드 입장하기';
             loginBtn.disabled = false;
         }
     }
