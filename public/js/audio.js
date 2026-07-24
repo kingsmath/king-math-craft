@@ -1,4 +1,4 @@
-// Procedural Web Audio API Sound Synthesizer
+// Procedural Web Audio API Sound Synthesizer for 킹수학크래프트
 class SoundEffects {
     constructor() {
         this.ctx = null;
@@ -55,7 +55,6 @@ class SoundEffects {
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
         
-        // Noise buffer for crunchy block break
         const bufferSize = this.ctx.sampleRate * 0.12;
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const output = buffer.getChannelData(0);

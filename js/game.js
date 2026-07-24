@@ -1,4 +1,30 @@
 // 3D Voxel Engine & Ultra-Fast GPU Instanced Renderer for 킹수학크래프트 (60+ FPS Ultra-Smooth)
+
+// Block Type Registry (IDs 20+ are new survival-system blocks; MUST mirror server.py constants)
+const BLOCK = {
+    AIR: 0, DIRT: 1, GRASS: 2, STONE: 3, WOOD: 4, LEAVES: 5, BRICK: 6, GLASS: 7,
+    GLOWSTONE: 8, DIAMOND_BLOCK: 9, PLAZA: 10, SIGNPOST: 11,
+    WATER: 20, SAND: 21, PATH: 22, COAL_ORE: 23, IRON_ORE: 24, GOLD_ORE: 25,
+    DIAMOND_ORE: 26, SAPLING: 27, CRAFTING_TABLE: 28, FURNACE: 29, FENCE: 30,
+    CAVE_STONE: 31, FLOWER: 32
+};
+const ORE_BLOCK_TYPES = new Set([BLOCK.COAL_ORE, BLOCK.IRON_ORE, BLOCK.GOLD_ORE, BLOCK.DIAMOND_ORE]);
+
+// Central Hub Zone Bounds [xMin, xMax, zMin, zMax] - MUST mirror ZONE_* constants in server.py
+const ZONES = {
+    FOREST: [-58, -4, -58, -4],
+    LAKE_ZONE: [4, 58, -58, -4],
+    LAKE_BASIN: [16, 50, -50, -16],
+    CAVE: [-56, -36, 4, 26],
+    WILD: [-58, -33, 2, 31],
+    PASTURE: [-30, -6, 34, 58],
+    PVP_ARENA: [10, 34, 10, 34],
+    CRAFT_PLAZA: [40, 57, 40, 57]
+};
+function inZone(x, z, zone) {
+    return x >= zone[0] && x <= zone[1] && z >= zone[2] && z <= zone[3];
+}
+
 class VoxelWorld {
     constructor(scene) {
         this.scene = scene;
@@ -82,6 +108,22 @@ class VoxelWorld {
         // Lush Green Living Room Floor Texture (녹색 거실 잔디 타일)
         const texGreenPlazaTop = createPixelTexture('#22c55e', '#16a34a', false, false, true);
 
+        // New Survival-System Block Textures
+        const texWater = createPixelTexture('#0ea5e9', '#0284c7');
+        const texSand = createPixelTexture('#e6d3a3', '#d4bc7d');
+        const texPath = createPixelTexture('#a8a29e', '#78716c');
+        const texCaveStone = createPixelTexture('#4b5563', '#374151');
+        const texCoalOre = createPixelTexture('#57534e', '#1c1917');
+        const texIronOre = createPixelTexture('#d6c9b8', '#b45309');
+        const texGoldOre = createPixelTexture('#fde68a', '#eab308');
+        const texDiamondOre = createPixelTexture('#67e8f9', '#06b6d4', false, false, false, true);
+        const texSapling = createPixelTexture('#4ade80', '#16a34a');
+        const texCraftingTop = createPixelTexture('#a16207', '#78350f', false, true);
+        const texCraftingSide = createPixelTexture('#92400e', '#78350f', false, true);
+        const texFurnace = createPixelTexture('#6b7280', '#374151', false, false, true);
+        const texFence = createPixelTexture('#92400e', '#5c3a21', false, true);
+        const texFlower = createPixelTexture('#fb7185', '#22c55e');
+
         this.materials = [
             null, // 0: Air
             new THREE.MeshStandardMaterial({ map: texDirt }), // 1: Dirt
@@ -110,6 +152,27 @@ class VoxelWorld {
             new THREE.MeshStandardMaterial({ map: texGreenPlazaTop }), // 10: Green Living Room Tile
             new THREE.MeshStandardMaterial({ map: texWoodTop })  // 11: Sign Wooden Post
         ];
+
+        this.materials[BLOCK.WATER] = new THREE.MeshStandardMaterial({ map: texWater, transparent: true, opacity: 0.65 });
+        this.materials[BLOCK.SAND] = new THREE.MeshStandardMaterial({ map: texSand });
+        this.materials[BLOCK.PATH] = new THREE.MeshStandardMaterial({ map: texPath });
+        this.materials[BLOCK.COAL_ORE] = new THREE.MeshStandardMaterial({ map: texCoalOre });
+        this.materials[BLOCK.IRON_ORE] = new THREE.MeshStandardMaterial({ map: texIronOre });
+        this.materials[BLOCK.GOLD_ORE] = new THREE.MeshStandardMaterial({ map: texGoldOre, emissive: 0xeab308, emissiveIntensity: 0.15 });
+        this.materials[BLOCK.DIAMOND_ORE] = new THREE.MeshStandardMaterial({ map: texDiamondOre, emissive: 0x06b6d4, emissiveIntensity: 0.25 });
+        this.materials[BLOCK.SAPLING] = new THREE.MeshStandardMaterial({ map: texSapling, transparent: true, opacity: 0.85 });
+        this.materials[BLOCK.CRAFTING_TABLE] = [
+            new THREE.MeshStandardMaterial({ map: texCraftingSide }),
+            new THREE.MeshStandardMaterial({ map: texCraftingSide }),
+            new THREE.MeshStandardMaterial({ map: texCraftingTop }),
+            new THREE.MeshStandardMaterial({ map: texCraftingTop }),
+            new THREE.MeshStandardMaterial({ map: texCraftingSide }),
+            new THREE.MeshStandardMaterial({ map: texCraftingSide }),
+        ];
+        this.materials[BLOCK.FURNACE] = new THREE.MeshStandardMaterial({ map: texFurnace });
+        this.materials[BLOCK.FENCE] = new THREE.MeshStandardMaterial({ map: texFence });
+        this.materials[BLOCK.CAVE_STONE] = new THREE.MeshStandardMaterial({ map: texCaveStone });
+        this.materials[BLOCK.FLOWER] = new THREE.MeshStandardMaterial({ map: texFlower, transparent: true, opacity: 0.9 });
 
         // 32 Distinct Parcel Floor Materials
         const parcelColors = [
@@ -251,8 +314,222 @@ class VoxelWorld {
             }
         }
 
+        this.buildCentralHub(groundHeight);
         this.createParcelSignposts(groundHeight);
         this.rebuildAllChunks();
+    }
+
+    // ==================================================================
+    // Central Hub (거실) Renewal: Garden / Forest / Lake / Cave&Mine /
+    // Pasture / PVP Arena / Crafting Plaza. Fully deterministic (no
+    // Math.random) so every client generates byte-identical geometry
+    // without needing to sync the base terrain over the network.
+    // ==================================================================
+    buildCentralHub(gy) {
+        this.buildGardenCenter(gy);
+        this.buildForest(gy);
+        this.buildLake(gy);
+        this.buildCaveAndMine(gy);
+        this.buildPasture(gy);
+        this.buildPvpArena(gy);
+        this.buildCraftPlaza(gy);
+    }
+
+    buildGardenCenter(gy) {
+        // Cross paths connecting all 4 hub quadrants
+        for (let x = -58; x <= 58; x++) {
+            for (let o = -1; o <= 1; o++) {
+                if (Math.abs(x) > 3) this.setBlock(x, gy, o, BLOCK.PATH, false);
+            }
+        }
+        for (let z = -58; z <= 58; z++) {
+            for (let o = -1; o <= 1; o++) {
+                if (Math.abs(z) > 3) this.setBlock(o, gy, z, BLOCK.PATH, false);
+            }
+        }
+
+        // Fountain / monument at the exact center
+        for (let x = -3; x <= 3; x++) {
+            for (let z = -3; z <= 3; z++) {
+                if (Math.max(Math.abs(x), Math.abs(z)) <= 3) this.setBlock(x, gy, z, BLOCK.PATH, false);
+            }
+        }
+        const ring = [[-2, -2], [2, -2], [-2, 2], [2, 2], [0, -3], [0, 3], [-3, 0], [3, 0]];
+        ring.forEach(([x, z]) => this.setBlock(x, gy + 1, z, BLOCK.GLOWSTONE, false));
+        // Crown beacon pillar
+        this.setBlock(0, gy + 1, 0, BLOCK.BRICK, false);
+        this.setBlock(0, gy + 2, 0, BLOCK.BRICK, false);
+        this.setBlock(0, gy + 3, 0, BLOCK.GLOWSTONE, false);
+
+        // Decorative flowers around the fountain
+        const flowers = [[-5, -5], [5, -5], [-5, 5], [5, 5], [-6, 0], [6, 0], [0, -6], [0, 6]];
+        flowers.forEach(([x, z]) => this.setBlock(x, gy + 1, z, BLOCK.FLOWER, false));
+    }
+
+    buildForest(gy) {
+        const [xMin, xMax, zMin, zMax] = ZONES.FOREST;
+        for (let x = xMin; x <= xMax; x++) {
+            for (let z = zMin; z <= zMax; z++) {
+                this.setBlock(x, gy, z, BLOCK.GRASS, false);
+            }
+        }
+        const treeSpots = [
+            [-52, -50], [-44, -52], [-36, -46], [-28, -50], [-20, -44], [-12, -36],
+            [-50, -30], [-42, -24], [-32, -16], [-22, -10], [-14, -20], [-46, -12],
+            [-36, -8], [-10, -52]
+        ];
+        treeSpots.forEach(([x, z]) => this.plantFullTree(x, gy + 1, z));
+
+        // Cleared patch with sample saplings, ready for players to grow more trees
+        const saplingSpots = [[-20, -18], [-18, -16], [-22, -16]];
+        saplingSpots.forEach(([x, z]) => this.setBlock(x, gy + 1, z, BLOCK.SAPLING, false));
+    }
+
+    plantFullTree(x, y, z) {
+        for (let i = 0; i < 4; i++) this.setBlock(x, y + i, z, BLOCK.WOOD, false);
+        for (let lx = -1; lx <= 1; lx++) {
+            for (let lz = -1; lz <= 1; lz++) {
+                this.setBlock(x + lx, y + 4, z + lz, BLOCK.LEAVES, false);
+                this.setBlock(x + lx, y + 5, z + lz, BLOCK.LEAVES, false);
+            }
+        }
+        this.setBlock(x, y + 6, z, BLOCK.LEAVES, false);
+    }
+
+    buildLake(gy) {
+        const [zxMin, zxMax, zzMin, zzMax] = ZONES.LAKE_ZONE;
+        for (let x = zxMin; x <= zxMax; x++) {
+            for (let z = zzMin; z <= zzMax; z++) {
+                this.setBlock(x, gy, z, BLOCK.GRASS, false);
+            }
+        }
+
+        const [bxMin, bxMax, bzMin, bzMax] = ZONES.LAKE_BASIN;
+        for (let x = bxMin - 2; x <= bxMax + 2; x++) {
+            for (let z = bzMin - 2; z <= bzMax + 2; z++) {
+                const insideBasin = x >= bxMin && x <= bxMax && z >= bzMin && z <= bzMax;
+                if (insideBasin) {
+                    this.setBlock(x, gy - 1, z, BLOCK.SAND, false);
+                    this.setBlock(x, gy, z, BLOCK.WATER, false);
+                    this.setBlock(x, gy + 1, z, BLOCK.WATER, false);
+                } else {
+                    this.setBlock(x, gy, z, BLOCK.SAND, false); // beach ring
+                }
+            }
+        }
+
+        // Small fishing dock jutting into the lake
+        for (let z = bzMin - 3; z <= bzMin + 1; z++) {
+            this.setBlock(33, gy, z, BLOCK.WOOD, false);
+            this.setBlock(34, gy, z, BLOCK.WOOD, false);
+        }
+    }
+
+    buildCaveAndMine(gy) {
+        const [wxMin, wxMax, wzMin, wzMax] = ZONES.WILD;
+        for (let x = wxMin; x <= wxMax; x++) {
+            for (let z = wzMin; z <= wzMax; z++) {
+                this.setBlock(x, gy, z, BLOCK.STONE, false);
+            }
+        }
+
+        const [cxMin, cxMax, czMin, czMax] = ZONES.CAVE;
+        const entranceMin = -48, entranceMax = -44;
+
+        // Floor & roof
+        for (let x = cxMin; x <= cxMax; x++) {
+            for (let z = czMin; z <= czMax; z++) {
+                this.setBlock(x, gy, z, BLOCK.CAVE_STONE, false);
+                this.setBlock(x, gy + 5, z, BLOCK.CAVE_STONE, false); // roof (y = gy+5 == world y9)
+            }
+        }
+
+        // Walls (deterministic ore formula - MUST mirror server.py get_cave_ore_type)
+        const wallCells = [];
+        for (let x = cxMin; x <= cxMax; x++) {
+            if (x >= entranceMin && x <= entranceMax) continue;
+            wallCells.push([x, czMin]);
+        }
+        for (let x = cxMin; x <= cxMax; x++) wallCells.push([x, czMax]);
+        for (let z = czMin + 1; z <= czMax - 1; z++) wallCells.push([cxMin, z]);
+        for (let z = czMin + 1; z <= czMax - 1; z++) wallCells.push([cxMax, z]);
+
+        let idx = 0;
+        wallCells.forEach(([x, z]) => {
+            [5, 6].forEach((wy) => {
+                idx++;
+                let type = BLOCK.CAVE_STONE;
+                if (idx % 23 === 0) type = BLOCK.DIAMOND_ORE;
+                else if (idx % 17 === 0) type = BLOCK.GOLD_ORE;
+                else if (idx % 11 === 0) type = BLOCK.IRON_ORE;
+                else if (idx % 7 === 0) type = BLOCK.COAL_ORE;
+                this.setBlock(x, gy + (wy - 4), z, type, false);
+            });
+            [7, 8].forEach((wy) => this.setBlock(x, gy + (wy - 4), z, BLOCK.CAVE_STONE, false));
+        });
+
+        // Standalone glowstone lamps on the cave floor (not part of the ore wall formula)
+        const lamps = [[-53, 8], [-46, 8], [-39, 8], [-53, 20], [-46, 20], [-39, 20]];
+        lamps.forEach(([x, z]) => this.setBlock(x, gy + 1, z, BLOCK.GLOWSTONE, false));
+    }
+
+    buildPasture(gy) {
+        const [xMin, xMax, zMin, zMax] = ZONES.PASTURE;
+        for (let x = xMin; x <= xMax; x++) {
+            for (let z = zMin; z <= zMax; z++) {
+                this.setBlock(x, gy, z, BLOCK.GRASS, false);
+            }
+        }
+        // Fence ring with a gate gap facing the garden center
+        for (let x = xMin; x <= xMax; x++) {
+            this.setBlock(x, gy + 1, zMin, BLOCK.FENCE, false);
+            this.setBlock(x, gy + 1, zMax, BLOCK.FENCE, false);
+        }
+        for (let z = zMin; z <= zMax; z++) {
+            const isGate = z >= zMin && z <= zMin + 2;
+            if (!isGate) this.setBlock(xMin, gy + 1, z, BLOCK.FENCE, false);
+            this.setBlock(xMax, gy + 1, z, BLOCK.FENCE, false);
+        }
+    }
+
+    buildPvpArena(gy) {
+        const [xMin, xMax, zMin, zMax] = ZONES.PVP_ARENA;
+        for (let x = xMin; x <= xMax; x++) {
+            for (let z = zMin; z <= zMax; z++) {
+                this.setBlock(x, gy, z, BLOCK.BRICK, false);
+            }
+        }
+        for (let x = xMin; x <= xMax; x++) {
+            const gate = x >= xMin + 10 && x <= xMin + 13;
+            for (let wy = 1; wy <= 3; wy++) {
+                if (!gate) {
+                    this.setBlock(x, gy + wy, zMin, BLOCK.BRICK, false);
+                    this.setBlock(x, gy + wy, zMax, BLOCK.BRICK, false);
+                }
+            }
+        }
+        for (let z = zMin; z <= zMax; z++) {
+            const gate = z >= zMin + 10 && z <= zMin + 13;
+            for (let wy = 1; wy <= 3; wy++) {
+                if (!gate) {
+                    this.setBlock(xMin, gy + wy, z, BLOCK.BRICK, false);
+                    this.setBlock(xMax, gy + wy, z, BLOCK.BRICK, false);
+                }
+            }
+        }
+    }
+
+    buildCraftPlaza(gy) {
+        const [xMin, xMax, zMin, zMax] = ZONES.CRAFT_PLAZA;
+        for (let x = xMin; x <= xMax; x++) {
+            for (let z = zMin; z <= zMax; z++) {
+                this.setBlock(x, gy, z, BLOCK.PATH, false);
+            }
+        }
+        const tables = [[43, 44], [50, 44], [43, 52], [50, 52]];
+        const furnaces = [[46, 44], [53, 44], [46, 52]];
+        tables.forEach(([x, z]) => this.setBlock(x, gy + 1, z, BLOCK.CRAFTING_TABLE, false));
+        furnaces.forEach(([x, z]) => this.setBlock(x, gy + 1, z, BLOCK.FURNACE, false));
     }
 
     createParcelSignposts(groundHeight) {
@@ -401,6 +678,9 @@ class MinecraftGame {
         this.world = new VoxelWorld(this.scene);
         this.physics = new PlayerPhysics(this.world);
         this.net = new NetworkManager(this);
+        this.dayNight = new DayNightCycle(this);
+        this.entities = new EntityManager(this);
+        this.inventory = new InventorySystem(this);
 
         const wireGeo = new THREE.BoxGeometry(1.01, 1.01, 1.01);
         const wireMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true });
@@ -412,6 +692,52 @@ class MinecraftGame {
         this.initNumberGridSelector();
         this.initEventListeners();
         this.initActiveTouchJoystick();
+        this.initCharacterCustomization();
+        this.initRoomIdCheck();
+    }
+
+    // Real-time room-id availability check (debounced) - min 4 characters required
+    initRoomIdCheck() {
+        const input = document.getElementById('username');
+        const statusEl = document.getElementById('room-id-status');
+        if (!input || !statusEl) return;
+
+        let debounceTimer = null;
+        input.addEventListener('input', () => {
+            const val = input.value.trim();
+            clearTimeout(debounceTimer);
+
+            if (val.length === 0) {
+                statusEl.textContent = '';
+                statusEl.className = 'room-id-status';
+                return;
+            }
+            if (val.length < 4) {
+                statusEl.textContent = '⚠️ 4글자 이상 입력해주세요';
+                statusEl.className = 'room-id-status warn';
+                return;
+            }
+
+            statusEl.textContent = '🔍 확인 중...';
+            statusEl.className = 'room-id-status checking';
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const result = await this.net.checkRoomId(val);
+                    if (input.value.trim() !== val) return; // stale response, input changed since
+                    if (result.exists) {
+                        statusEl.textContent = 'ℹ️ 이미 있는 방이에요 (비밀번호 필요)';
+                        statusEl.className = 'room-id-status info';
+                    } else {
+                        statusEl.textContent = '✅ 사용 가능한 이름이에요!';
+                        statusEl.className = 'room-id-status ok';
+                    }
+                } catch (e) {
+                    statusEl.textContent = '';
+                    statusEl.className = 'room-id-status';
+                }
+            }, 450);
+        });
     }
 
     initLighting() {
@@ -419,6 +745,7 @@ class MinecraftGame {
         this.scene.fog = new THREE.FogExp2(0x78a7ff, 0.015);
 
         const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
+        this.hemiLight = hemiLight;
         this.scene.add(hemiLight);
 
         this.sun = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -462,24 +789,28 @@ class MinecraftGame {
 
     // Active Movable Dynamic Touch Joystick Implementation (Bottom-Left Joystick, Bottom-Right Actions)
     initActiveTouchJoystick() {
+        const zone = document.getElementById('joystick-zone');
         const container = document.getElementById('joystick-container');
         const knob = document.getElementById('joystick-knob');
-        if (!container || !knob) return;
+        if (!zone || !container || !knob) return;
 
         let activeTouchId = null;
-        let baseRect = null;
         let centerX = 0;
         let centerY = 0;
         const maxRadius = 45; // Max knob drag radius in pixels
+        const half = 60; // half of the 120px joystick container
 
         const handleStart = (e) => {
             if (activeTouchId !== null) return;
             const touch = e.changedTouches ? e.changedTouches[0] : e;
             activeTouchId = touch.identifier !== undefined ? touch.identifier : 'mouse';
-            
-            baseRect = container.getBoundingClientRect();
-            centerX = baseRect.left + baseRect.width / 2;
-            centerY = baseRect.top + baseRect.height / 2;
+
+            // Floating joystick: spawn centered exactly where the finger landed
+            centerX = touch.clientX;
+            centerY = touch.clientY;
+            container.style.left = `${centerX - half}px`;
+            container.style.top = `${centerY - half}px`;
+            container.classList.add('active');
 
             handleMove(e);
         };
@@ -541,6 +872,7 @@ class MinecraftGame {
 
             activeTouchId = null;
             knob.style.transform = `translate(0px, 0px)`;
+            container.classList.remove('active');
 
             this.physics.keys.forward = false;
             this.physics.keys.backward = false;
@@ -548,13 +880,13 @@ class MinecraftGame {
             this.physics.keys.right = false;
         };
 
-        container.addEventListener('touchstart', handleStart);
+        zone.addEventListener('touchstart', handleStart);
         window.addEventListener('touchmove', handleMove);
         window.addEventListener('touchend', handleEnd);
         window.addEventListener('touchcancel', handleEnd);
 
-        // Desktop mouse support for testing active joystick
-        container.addEventListener('mousedown', handleStart);
+        // Desktop mouse support for testing the floating joystick
+        zone.addEventListener('mousedown', handleStart);
         window.addEventListener('mousemove', (e) => {
             if (activeTouchId === 'mouse') handleMove(e);
         });
@@ -567,6 +899,7 @@ class MinecraftGame {
         if (breakBtn) {
             breakBtn.addEventListener('click', (e) => {
                 e.preventDefault();
+                if (this.inventory.attemptAttack()) return;
                 const target = this.physics.raycastTarget(6.0);
                 if (target.hit) {
                     const { x, y, z } = target.targetBlock;
@@ -574,7 +907,9 @@ class MinecraftGame {
                         this.showToast('⚠️ 가장 바닥 지형은 파괴할 수 없습니다!');
                         return;
                     }
+                    const brokenType = this.world.getBlock(x, y, z);
                     this.net.sendBlockChange(x, y, z, 0);
+                    this.inventory.grantFromBlockBreak(brokenType);
                 }
             });
         }
@@ -589,6 +924,15 @@ class MinecraftGame {
                     const { x, y, z } = target.placeBlock;
                     this.net.sendBlockChange(x, y, z, this.selectedSlot);
                 }
+            });
+        }
+
+        // Interact Button (crafting table / furnace / fishing) - mobile equivalent of the 'F' key
+        const interactBtn = document.getElementById('btn-touch-interact');
+        if (interactBtn) {
+            interactBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.inventory.handleInteract();
             });
         }
 
@@ -628,33 +972,58 @@ class MinecraftGame {
             }, { passive: false });
         }
 
-        // Touch Drag for Camera Rotation on Canvas
+        // Touch Drag for Camera Rotation on Canvas - tracked by its OWN touch identifier so it
+        // keeps working simultaneously while a separate finger drives the movement joystick
+        // (e.touches includes every touch on the whole screen, not just this element, so we
+        // must use changedTouches + identifier matching instead of blindly reading touches[0]).
+        let cameraTouchId = null;
+
         this.canvas.addEventListener('touchstart', (e) => {
-            if (e.touches.length > 0) {
-                this.touchPreviousX = e.touches[0].clientX;
-                this.touchPreviousY = e.touches[0].clientY;
-            }
+            if (cameraTouchId !== null) return;
+            const touch = e.changedTouches[0];
+            cameraTouchId = touch.identifier;
+            this.touchPreviousX = touch.clientX;
+            this.touchPreviousY = touch.clientY;
         });
 
         this.canvas.addEventListener('touchmove', (e) => {
-            if (e.touches.length > 0) {
-                const touchX = e.touches[0].clientX;
-                const touchY = e.touches[0].clientY;
-
-                const deltaX = touchX - this.touchPreviousX;
-                const deltaY = touchY - this.touchPreviousY;
-
-                const sensitivity = 0.004;
-                this.physics.rotation.y -= deltaX * sensitivity;
-                this.physics.rotation.x -= deltaY * sensitivity;
-
-                const maxPitch = Math.PI / 2 - 0.05;
-                this.physics.rotation.x = Math.max(-maxPitch, Math.min(maxPitch, this.physics.rotation.x));
-
-                this.touchPreviousX = touchX;
-                this.touchPreviousY = touchY;
+            if (cameraTouchId === null) return;
+            let touch = null;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === cameraTouchId) {
+                    touch = e.changedTouches[i];
+                    break;
+                }
             }
+            if (!touch) return;
+
+            const touchX = touch.clientX;
+            const touchY = touch.clientY;
+
+            const deltaX = touchX - this.touchPreviousX;
+            const deltaY = touchY - this.touchPreviousY;
+
+            const sensitivity = 0.004;
+            this.physics.rotation.y -= deltaX * sensitivity;
+            this.physics.rotation.x -= deltaY * sensitivity;
+
+            const maxPitch = Math.PI / 2 - 0.05;
+            this.physics.rotation.x = Math.max(-maxPitch, Math.min(maxPitch, this.physics.rotation.x));
+
+            this.touchPreviousX = touchX;
+            this.touchPreviousY = touchY;
         });
+
+        const releaseCameraTouch = (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === cameraTouchId) {
+                    cameraTouchId = null;
+                    break;
+                }
+            }
+        };
+        this.canvas.addEventListener('touchend', releaseCameraTouch);
+        this.canvas.addEventListener('touchcancel', releaseCameraTouch);
     }
 
     initEventListeners() {
@@ -701,6 +1070,28 @@ class MinecraftGame {
         });
 
         document.addEventListener('keydown', (e) => {
+            const chatForm = document.getElementById('chat-form');
+            const chatInput = document.getElementById('chat-input');
+            const isChatOpen = chatForm && !chatForm.classList.contains('hidden');
+
+            // BUGFIX: while the chat box is focused/open, typed characters (w/a/s/d, space,
+            // number keys, h, etc.) must NOT leak into game hotkeys (movement, jump, hotbar, controls popup).
+            if (isChatOpen && document.activeElement === chatInput) {
+                if (e.code === 'Enter') {
+                    if (chatInput.value.trim()) {
+                        this.net.sendChatMessage(chatInput.value.trim());
+                        chatInput.value = '';
+                    }
+                    chatForm.classList.add('hidden');
+                    this.canvas.requestPointerLock();
+                } else if (e.code === 'Escape') {
+                    chatInput.value = '';
+                    chatForm.classList.add('hidden');
+                    this.canvas.requestPointerLock();
+                }
+                return; // Swallow every other key while typing in chat
+            }
+
             if (e.code === 'KeyW') this.physics.keys.forward = true;
             if (e.code === 'KeyS') this.physics.keys.backward = true;
             if (e.code === 'KeyA') this.physics.keys.left = true;
@@ -718,23 +1109,24 @@ class MinecraftGame {
                 toggleDropdown();
             }
 
+            // 'F' key interacts with crafting table / furnace / water (fishing)
+            if (e.code === 'KeyF') {
+                this.inventory.handleInteract();
+            }
+
             if (e.code === 'KeyT' || e.code === 'Enter') {
-                const chatForm = document.getElementById('chat-form');
-                const chatInput = document.getElementById('chat-input');
                 if (chatForm.classList.contains('hidden')) {
                     chatForm.classList.remove('hidden');
                     chatInput.focus();
                     document.exitPointerLock();
-                } else if (e.code === 'Enter' && chatInput.value.trim()) {
-                    this.net.sendChatMessage(chatInput.value.trim());
-                    chatInput.value = '';
-                    chatForm.classList.add('hidden');
-                    this.canvas.requestPointerLock();
                 }
             }
         });
 
         document.addEventListener('keyup', (e) => {
+            const chatInput = document.getElementById('chat-input');
+            if (document.activeElement === chatInput) return;
+
             if (e.code === 'KeyW') this.physics.keys.forward = false;
             if (e.code === 'KeyS') this.physics.keys.backward = false;
             if (e.code === 'KeyA') this.physics.keys.left = false;
@@ -761,6 +1153,8 @@ class MinecraftGame {
                 return;
             }
 
+            if (e.button === 0 && this.inventory.attemptAttack()) return;
+
             const target = this.physics.raycastTarget(6.0);
             if (target.hit) {
                 if (e.button === 0) {
@@ -769,7 +1163,9 @@ class MinecraftGame {
                         this.showToast('⚠️ 가장 바닥 지형은 파괴할 수 없습니다!');
                         return;
                     }
+                    const brokenType = this.world.getBlock(x, y, z);
                     this.net.sendBlockChange(x, y, z, 0);
+                    this.inventory.grantFromBlockBreak(brokenType);
                 } else if (e.button === 2) {
                     const { x, y, z } = target.placeBlock;
                     const p = this.physics.position;
@@ -795,6 +1191,15 @@ class MinecraftGame {
             const password = document.getElementById('password').value.trim();
             const parcelPin = document.getElementById('parcel-pin').value.trim();
             const playerNum = parseInt(document.getElementById('selected-number').value || '1');
+
+            if (username.length < 4) {
+                const errDiv = document.getElementById('login-error');
+                if (errDiv) {
+                    errDiv.innerText = '⚠️ 방 아이디는 4글자 이상이어야 합니다.';
+                    errDiv.classList.remove('hidden');
+                }
+                return;
+            }
             if (username && password && parcelPin) {
                 this.net.connect(username, password, parcelPin, playerNum);
             }
@@ -805,10 +1210,17 @@ class MinecraftGame {
             this.net.sendSaveMapRequest();
         });
 
-        // Download Map File Button Handler
-        document.getElementById('btn-download-map').addEventListener('click', () => {
-            this.downloadMapFile();
-        });
+        // Fullscreen Toggle Button Handler
+        const fullscreenBtn = document.getElementById('btn-fullscreen');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                } else {
+                    document.exitFullscreen().catch(() => {});
+                }
+            });
+        }
 
         // Host Load Map Prompt Modal Buttons
         document.getElementById('btn-load-yes').addEventListener('click', () => {
@@ -829,29 +1241,6 @@ class MinecraftGame {
                 this.selectSlot(parseInt(slot.dataset.slot));
             });
         });
-    }
-
-    downloadMapFile() {
-        const roomName = this.net.username || '수학방';
-        const mapData = {
-            room_id: roomName,
-            saved_at: new Date().toISOString(),
-            blocks: Object.fromEntries(this.world.blocks)
-        };
-
-        const jsonStr = JSON.stringify(mapData, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `킹수학크래프트_지도_${roomName}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        this.showToast(`📥 [${roomName}] 지도가 파일로 다운로드되었습니다!`);
     }
 
     showHostLoadModal() {
@@ -930,8 +1319,79 @@ class MinecraftGame {
         }
 
         this.net.updateRemotePlayers(delta);
+        this.dayNight.update();
+        this.entities.update(delta);
+        this.inventory.tick(delta);
 
         this.renderer.render(this.scene, this.camera);
+    }
+
+    // ==================================================================
+    // Character Customization (skin / shirt / pants / hat)
+    // ==================================================================
+    initCharacterCustomization() {
+        const SKIN_COLORS = ['#ffdbac', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#3b2417'];
+        const SHIRT_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#111827', '#f8fafc'];
+        const PANTS_COLORS = ['#1e3a8a', '#374151', '#78350f', '#166534', '#111827', '#7c2d12'];
+        const HATS = [{ id: 'none', label: '없음' }, { id: 'crown', label: '👑 왕관' }];
+
+        this.appearance = { skin: SKIN_COLORS[0], shirt: SHIRT_COLORS[5], pants: PANTS_COLORS[0], hat: 'none' };
+        try {
+            const saved = localStorage.getItem('kmc_appearance');
+            if (saved) this.appearance = Object.assign(this.appearance, JSON.parse(saved));
+        } catch (e) { /* ignore corrupt storage */ }
+
+        const buildSwatchRow = (containerId, key, values, isColor) => {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '';
+            values.forEach((v) => {
+                const el = document.createElement('div');
+                el.className = isColor ? 'swatch' : 'swatch hat-swatch';
+                if (isColor) el.style.background = v;
+                else el.innerText = v.label;
+                const value = isColor ? v : v.id;
+                if (this.appearance[key] === value) el.classList.add('selected');
+                el.addEventListener('click', () => {
+                    this.appearance[key] = value;
+                    container.querySelectorAll('.swatch').forEach((s) => s.classList.remove('selected'));
+                    el.classList.add('selected');
+                    this.saveAndBroadcastAppearance();
+                });
+                container.appendChild(el);
+            });
+        };
+
+        const btn = document.getElementById('btn-character');
+        const modal = document.getElementById('character-modal');
+        if (btn && modal) {
+            btn.addEventListener('click', () => {
+                modal.classList.remove('hidden');
+                buildSwatchRow('swatch-skin', 'skin', SKIN_COLORS, true);
+                buildSwatchRow('swatch-shirt', 'shirt', SHIRT_COLORS, true);
+                buildSwatchRow('swatch-pants', 'pants', PANTS_COLORS, true);
+                buildSwatchRow('swatch-hat', 'hat', HATS, false);
+            });
+        }
+        const closeBtn = document.getElementById('btn-close-character');
+        if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    }
+
+    saveAndBroadcastAppearance() {
+        try { localStorage.setItem('kmc_appearance', JSON.stringify(this.appearance)); } catch (e) { /* ignore */ }
+        this.net.sendAppearanceUpdate(this.appearance);
+    }
+
+    // Called once after login: if the player previously customized their look on this
+    // browser, push it to the server; otherwise adopt whatever the server had saved.
+    onLoginAppearance(serverAppearance) {
+        let hadLocal = false;
+        try { hadLocal = !!localStorage.getItem('kmc_appearance'); } catch (e) { /* ignore */ }
+        if (hadLocal) {
+            this.saveAndBroadcastAppearance();
+        } else if (serverAppearance) {
+            this.appearance = Object.assign(this.appearance, serverAppearance);
+        }
     }
 }
 
