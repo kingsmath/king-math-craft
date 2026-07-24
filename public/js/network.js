@@ -22,41 +22,36 @@ class NetworkManager {
     }
 
     getServerUrl() {
-        const host = window.location.host;
-
-        // If hosted on Cloudflare Pages (.pages.dev), GitHub Pages (.github.io), Netlify, or Vercel, connect to Render Python Backend!
-        if (this.isExternalStaticHost()) {
-            return 'wss://king-math-craft.onrender.com/ws';
-        }
-
+        const host = window.location.host || '';
         if (!host || host.includes('localhost') || host.includes('127.0.0.1')) {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             return `${protocol}//${host || 'localhost:8000'}/ws`;
         }
-
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        return `${protocol}//${host}/ws`;
+        // All non-localhost deployments connect to Render Backend
+        return 'wss://king-math-craft.onrender.com/ws';
     }
 
     getHttpBaseUrl() {
-        const host = window.location.host;
-
-        if (this.isExternalStaticHost()) {
-            return 'https://king-math-craft.onrender.com';
-        }
+        const host = window.location.host || '';
         if (!host || host.includes('localhost') || host.includes('127.0.0.1')) {
             const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
             return `${protocol}//${host || 'localhost:8000'}`;
         }
-        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-        return `${protocol}//${host}`;
+        return 'https://king-math-craft.onrender.com';
     }
 
     async checkRoomId(roomId) {
-        const url = `${this.getHttpBaseUrl()}/api/check-room?id=${encodeURIComponent(roomId)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('check-room request failed');
-        return res.json();
+        try {
+            const url = `${this.getHttpBaseUrl()}/api/check-room?id=${encodeURIComponent(roomId)}`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!res.ok) return { exists: false, registered_numbers: [] };
+            return await res.json();
+        } catch (e) {
+            return { exists: false, registered_numbers: [] };
+        }
     }
 
     connect(username, password, parcelPin, playerNum) {

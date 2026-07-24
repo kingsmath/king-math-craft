@@ -1423,19 +1423,32 @@ class MinecraftGame {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
             const parcelPin = document.getElementById('parcel-pin').value.trim();
-            const playerNum = parseInt(document.getElementById('selected-number').value || '1');
+            const playerNum = parseInt(document.getElementById('selected-number').value || '1', 10);
 
+            const errDiv = document.getElementById('login-error');
             if (username.length < 4) {
-                const errDiv = document.getElementById('login-error');
                 if (errDiv) {
                     errDiv.innerText = '⚠️ 방 아이디는 4글자 이상이어야 합니다.';
                     errDiv.classList.remove('hidden');
                 }
                 return;
             }
-            if (username && password && parcelPin) {
-                this.net.connect(username, password, parcelPin, playerNum);
+            if (!password) {
+                if (errDiv) {
+                    errDiv.innerText = '⚠️ 방 비밀번호를 입력해주세요.';
+                    errDiv.classList.remove('hidden');
+                }
+                return;
             }
+            if (!parcelPin) {
+                if (errDiv) {
+                    errDiv.innerText = '⚠️ 선택한 번호 비밀번호를 입력해주세요.';
+                    errDiv.classList.remove('hidden');
+                }
+                return;
+            }
+
+            this.net.connect(username, password, parcelPin, playerNum);
         });
 
         // Fullscreen Toggle Button Handler
