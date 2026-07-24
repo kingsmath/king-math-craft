@@ -1423,9 +1423,8 @@ class MinecraftGame {
             chatFormEl.addEventListener('submit', (e) => e.preventDefault());
         }
 
-        // Login Form Submission
-        document.getElementById('login-form').addEventListener('submit', (e) => {
-            e.preventDefault();
+        // Login Form Submission & Button Click Handlers (Defensive double-guard against native form submit reloads)
+        const doLogin = () => {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
             const parcelPin = document.getElementById('parcel-pin').value.trim();
@@ -1455,7 +1454,25 @@ class MinecraftGame {
             }
 
             this.net.connect(username, password, parcelPin, playerNum);
-        });
+        };
+
+        const loginFormEl = document.getElementById('login-form');
+        if (loginFormEl) {
+            loginFormEl.addEventListener('submit', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                doLogin();
+            });
+        }
+
+        const loginBtnEl = document.getElementById('btn-login');
+        if (loginBtnEl) {
+            loginBtnEl.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                doLogin();
+            });
+        }
 
         // Fullscreen Toggle Button Handler
         const fullscreenBtn = document.getElementById('btn-fullscreen');
