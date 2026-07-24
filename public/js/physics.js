@@ -2,7 +2,7 @@
 class PlayerPhysics {
     constructor(world) {
         this.world = world;
-        this.position = new THREE.Vector3(0, 15, 0);
+        this.position = new THREE.Vector3(0, 5.0, 0); // Start on Flat Ground (Y=5)
         this.velocity = new THREE.Vector3(0, 0, 0);
         this.rotation = { x: 0, y: 0 }; // x: pitch, y: yaw
         this.onGround = false;
@@ -30,8 +30,8 @@ class PlayerPhysics {
         this.walkSpeed = 6.0;
         this.sprintSpeed = 9.0;
         this.sneakSpeed = 2.4;
-        this.jumpForce = 9.0;
-        this.gravity = 26.0;
+        this.jumpForce = 8.5;
+        this.gravity = 24.0;
     }
 
     getParcelNumber(x, z) {
@@ -119,20 +119,26 @@ class PlayerPhysics {
             currentSpeed = this.sneakSpeed;
         }
 
-        // Forward / Backward / Strafe Input
-        const moveDir = new THREE.Vector3();
-        if (this.keys.forward) moveDir.z -= 1;
-        if (this.keys.backward) moveDir.z += 1;
-        if (this.keys.left) moveDir.x -= 1;
-        if (this.keys.right) moveDir.x += 1;
+        // Standard FPS Movement Vectors (Forward / Right)
+        let forwardInput = 0;
+        let rightInput = 0;
 
-        if (moveDir.lengthSq() > 0) {
-            moveDir.normalize();
+        if (this.keys.forward) forwardInput += 1;
+        if (this.keys.backward) forwardInput -= 1;
+        if (this.keys.right) rightInput += 1;
+        if (this.keys.left) rightInput -= 1;
+
+        if (forwardInput !== 0 || rightInput !== 0) {
+            const length = Math.sqrt(forwardInput * forwardInput + rightInput * rightInput);
+            forwardInput /= length;
+            rightInput /= length;
+
             const sinYaw = Math.sin(this.rotation.y);
             const cosYaw = Math.cos(this.rotation.y);
 
-            const dx = moveDir.x * cosYaw - moveDir.z * sinYaw;
-            const dz = moveDir.x * sinYaw + moveDir.z * cosYaw;
+            // Exact FPS Directional Math (W moves towards look direction, D moves right)
+            const dx = forwardInput * (-sinYaw) + rightInput * cosYaw;
+            const dz = forwardInput * (-cosYaw) + rightInput * (-sinYaw);
 
             this.velocity.x = dx * currentSpeed;
             this.velocity.z = dz * currentSpeed;
@@ -205,7 +211,7 @@ class PlayerPhysics {
         }
     }
 
-    // Accurate Raycasting for Block Detection & Face Normal Target Block Placement
+    // Accurate Raycasting for Block Detection & Placement
     raycastTarget(maxDistance = 6.0) {
         const eye = this.getEyePosition();
         const dir = this.getLookVector();
