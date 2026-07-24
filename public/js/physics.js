@@ -1,4 +1,4 @@
-// Player Physics & Traditional Minecraft Controls Engine (15x15 Parcels)
+// Player Physics & Fast Responsive Controls Engine (15x15 Parcels, Optimized Speed)
 class PlayerPhysics {
     constructor(world) {
         this.world = world;
@@ -26,11 +26,11 @@ class PlayerPhysics {
             sprint: false
         };
 
-        // Traditional Minecraft Physics Constants
-        this.walkSpeed = 6.0;
-        this.sprintSpeed = 9.0;
-        this.sneakSpeed = 2.4;
-        this.jumpForce = 8.5;
+        // Boosted Fast Movement Speeds for Large 15x15 Parcels & 120x120 Plaza
+        this.walkSpeed = 10.0;   // Increased from 6.0 -> 10.0 for swift movement
+        this.sprintSpeed = 16.0; // Increased from 9.0 -> 16.0 for fast sprinting
+        this.sneakSpeed = 4.0;   // Increased from 2.4 -> 4.0
+        this.jumpForce = 9.2;    // Responsive jump
         this.gravity = 24.0;
     }
 
