@@ -56,7 +56,7 @@ ZONE_WILD = (-58, -33, 2, 31)          # hostile mob roam/spawn area (superset o
 ZONE_PASTURE = (-30, -6, 34, 58)
 ZONE_PVP_ARENA = (10, 34,10, 34)
 
-RESPAWN_POINT = {"x": 0.0, "y": 6.0, "z": 0.0}
+RESPAWN_POINT = {"x": 0.0, "y": 11.0, "z": 0.0}
 SAPLING_GROW_SECONDS = 60
 ORE_RESPAWN_SECONDS = 75
 
@@ -134,12 +134,13 @@ _CAVE_WALL_CELLS = _build_cave_wall_cells()
 
 
 def get_cave_ore_type(x, y, z):
-    """Returns the ore block id that belongs at (x,y,z) if it's an ore wall cell, else None."""
-    if y not in (5, 6):
+    """Returns the ore block id that belongs at (x,y,z) if it's an ore wall cell, else None.
+    Ore rows sit at world y=10,11 (gy+1, gy+2 with gy=9) - MUST mirror js/game.js buildCaveAndMine."""
+    if y not in (10, 11):
         return None
     idx = 0
     for (cx, cz) in _CAVE_WALL_CELLS:
-        for wy in (5, 6):
+        for wy in (10, 11):
             idx += 1
             if cx == x and cz == z and wy == y:
                 if idx % 23 == 0:
@@ -324,20 +325,20 @@ def _spawn_mobs(room):
     if room["day_phase"] == "night" and len(hostiles) < HOSTILE_CAP:
         mob_type = random.choice(["zombie", "skeleton"])
         x, z = rand_in_bounds(ZONE_WILD, margin=1)
-        _create_mob(room, mob_type, x, 5.0, z)
+        _create_mob(room, mob_type, x, 10.0, z)
 
     if len(animals) < ANIMAL_CAP:
         mob_type = random.choice(["cow", "pig", "chicken"])
         x, z = rand_in_bounds(ZONE_PASTURE, margin=2)
-        _create_mob(room, mob_type, x, 5.0, z)
+        _create_mob(room, mob_type, x, 10.0, z)
 
     if len(bears) < BEAR_CAP and random.random() < 0.15:
         x, z = rand_in_bounds(ZONE_PASTURE, margin=2)
-        _create_mob(room, "bear", x, 5.0, z)
+        _create_mob(room, "bear", x, 10.0, z)
 
     if len(fish) < FISH_CAP:
         x, z = rand_in_bounds(ZONE_LAKE_BASIN, margin=1)
-        _create_mob(room, "fish", x, 4.6, z)
+        _create_mob(room, "fish", x, 9.6, z)
 
 
 def _create_mob(room, mob_type, x, y, z):
@@ -690,7 +691,7 @@ async def websocket_handler(request):
                         "player_number": player_num,
                         "is_host": is_host,
                         "x": 0.0,
-                        "y": 5.0,
+                        "y": 10.0,
                         "z": 0.0,
                         "rotX": 0.0,
                         "rotY": 0.0,

@@ -379,11 +379,11 @@ class NetworkManager {
 
         if (!this.remotePlayers.has(id)) {
             const meshGroup = this.createPlayerMesh(pData.player_number || 1, id, pData.appearance);
-            meshGroup.position.set(pData.x || 0, pData.y || 5.0, pData.z || 0);
+            meshGroup.position.set(pData.x || 0, pData.y || 10.0, pData.z || 0);
             this.game.scene.add(meshGroup);
             this.remotePlayers.set(id, {
                 group: meshGroup,
-                targetPos: new THREE.Vector3(pData.x || 0, pData.y || 5.0, pData.z || 0),
+                targetPos: new THREE.Vector3(pData.x || 0, pData.y || 10.0, pData.z || 0),
                 targetRotY: pData.rotY || 0
             });
         } else {

@@ -291,11 +291,20 @@ class VoxelWorld {
     // Completely Flat Surface Generation (Y = 4 Surface Only for Ultra GPU Efficiency)
     generateWorld() {
         const half = 80;
-        const groundHeight = 4;
+        // Bedrock stays unbreakable at y=4 (BASE_UNBREAKABLE_Y, mirrored in server.py block_change
+        // handler). Surface sits 5 layers above it (y=9) so players can dig down through 5 diggable
+        // layers (dirt just under the surface, stone below that) before hitting solid bedrock.
+        const groundHeight = 9;
 
         for (let x = -half; x < half; x++) {
             for (let z = -half; z < half; z++) {
                 const parcel = this.getParcelNumber(x, z);
+
+                // 4 diggable underground layers between bedrock (y=4) and the surface (y=9)
+                this.blocks.set(this.getKey(x, groundHeight - 1, z), BLOCK.DIRT);
+                this.blocks.set(this.getKey(x, groundHeight - 2, z), BLOCK.STONE);
+                this.blocks.set(this.getKey(x, groundHeight - 3, z), BLOCK.STONE);
+                this.blocks.set(this.getKey(x, groundHeight - 4, z), BLOCK.STONE);
 
                 if (parcel === 0) {
                     // Green Living Room Plaza (녹색 거실)
@@ -587,6 +596,13 @@ class VoxelWorld {
             const signGeo = new THREE.PlaneGeometry(1.4, 0.7);
             const signMesh = new THREE.Mesh(signGeo, signMat);
             signMesh.position.set(p.x + 0.5, groundHeight + 2.1, p.z + 0.5);
+
+            // Rotate each sign to face INTO the central plaza so the text reads left-to-right
+            // for a viewer standing in the plaza, regardless of which of the 4 sides it's on.
+            if (p.num >= 1 && p.num <= 8) signMesh.rotation.y = 0;                 // North: face south (+Z)
+            else if (p.num >= 9 && p.num <= 16) signMesh.rotation.y = -Math.PI / 2; // East: face west (-X)
+            else if (p.num >= 17 && p.num <= 24) signMesh.rotation.y = Math.PI;     // South: face north (-Z)
+            else signMesh.rotation.y = Math.PI / 2;                                 // West: face east (+X)
 
             this.signGroup.add(signMesh);
         });

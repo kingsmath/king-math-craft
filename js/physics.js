@@ -8,7 +8,7 @@ function isSolidBlockType(type) {
 class PlayerPhysics {
     constructor(world) {
         this.world = world;
-        this.position = new THREE.Vector3(0, 5.0, 0); // Start on Flat Ground (Y=5)
+        this.position = new THREE.Vector3(0, 10.0, 0); // Start on Flat Ground (surface y=9, feet at y=10)
         this.velocity = new THREE.Vector3(0, 0, 0);
         this.rotation = { x: 0, y: 0 }; // x: pitch, y: yaw
         this.onGround = false;
