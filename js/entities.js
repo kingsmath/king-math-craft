@@ -20,6 +20,109 @@ function raySphereHitTest(eye, dir, targets, maxDist, radius) {
     return best;
 }
 
+// Frees every geometry/material (and its canvas textures) under an Object3D before it is
+// dropped from the scene - character/held-item meshes get rebuilt whenever appearance or the
+// equipped weapon changes, so without this the GPU would slowly leak them.
+function disposeObject3D(obj) {
+    if (!obj) return;
+    obj.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        const mats = Array.isArray(child.material) ? child.material : (child.material ? [child.material] : []);
+        mats.forEach((m) => {
+            if (m.map && m.map.dispose) m.map.dispose();
+            if (m.dispose) m.dispose();
+        });
+    });
+}
+
+// Metal/head tint per tool tier - the prefix of every weapon/tool id in RECIPES
+// ('iron_sword' -> 'iron'), used by buildHeldItemMesh below.
+const TOOL_TIER_COLORS = {
+    wood: 0xa9713d, stone: 0x9ca3af, iron: 0xe5e7eb, gold: 0xfbbf24, diamond: 0x22d3ee
+};
+const TOOL_HANDLE_COLOR = 0x6b4423;
+
+// Blocky sword / axe / pickaxe / fishing-rod model for a crafted item id, so an equipped
+// weapon is actually visible in the holder's hand (first-person view-model, third-person
+// avatar, and every remote player). Built in "in hand" orientation: the handle runs along
+// +Y with the head at the top, so the caller only has to tilt it forward at the wrist.
+// Returns null for anything that isn't a held tool/weapon.
+function buildHeldItemMesh(itemId) {
+    if (!itemId || typeof itemId !== 'string') return null;
+
+    const group = new THREE.Group();
+    const handleMat = new THREE.MeshStandardMaterial({ color: TOOL_HANDLE_COLOR, roughness: 0.9 });
+    const addBox = (w, h, d, mat, x, y, z) => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+        mesh.position.set(x, y, z);
+        group.add(mesh);
+        return mesh;
+    };
+
+    if (itemId === 'fishing_rod') {
+        addBox(0.05, 0.72, 0.05, handleMat, 0, 0.18, 0);
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+        addBox(0.012, 0.45, 0.012, lineMat, 0.02, 0.32, 0.14);
+        return group;
+    }
+
+    const underscore = itemId.indexOf('_');
+    if (underscore < 0) return null;
+    const tier = itemId.slice(0, underscore);
+    const kind = itemId.slice(underscore + 1);
+    const headColor = TOOL_TIER_COLORS[tier];
+    if (!headColor || (kind !== 'sword' && kind !== 'axe' && kind !== 'pickaxe')) return null;
+
+    const headMat = new THREE.MeshStandardMaterial({
+        color: headColor,
+        metalness: tier === 'wood' ? 0.0 : 0.45,
+        roughness: tier === 'wood' ? 0.9 : 0.35,
+        emissive: tier === 'diamond' ? 0x0e7490 : 0x000000,
+        emissiveIntensity: tier === 'diamond' ? 0.35 : 0
+    });
+
+    if (kind === 'sword') {
+        addBox(0.06, 0.28, 0.06, handleMat, 0, 0, 0);          // grip
+        addBox(0.26, 0.05, 0.08, headMat, 0, 0.17, 0);          // cross guard
+        addBox(0.09, 0.52, 0.045, headMat, 0, 0.46, 0);         // blade
+        addBox(0.05, 0.09, 0.045, headMat, 0, 0.76, 0);         // tip
+    } else if (kind === 'axe') {
+        addBox(0.06, 0.62, 0.06, handleMat, 0, 0.06, 0);        // haft
+        addBox(0.1, 0.24, 0.09, headMat, 0.07, 0.3, 0);         // head body
+        addBox(0.14, 0.3, 0.07, headMat, 0.17, 0.29, 0);        // blade edge
+    } else {
+        addBox(0.06, 0.62, 0.06, handleMat, 0, 0.06, 0);        // haft
+        addBox(0.44, 0.07, 0.07, headMat, 0, 0.36, 0);          // cross head
+        addBox(0.08, 0.1, 0.07, headMat, -0.18, 0.29, 0);       // left tip
+        addBox(0.08, 0.1, 0.07, headMat, 0.18, 0.29, 0);        // right tip
+    }
+
+    return group;
+}
+
+// Puts (or clears) a held weapon in a humanoid character's right hand. `group` is any mesh
+// built with userData.arms = [leftArmPivot, rightArmPivot] - i.e. remote players, the local
+// third-person avatar. The arm pivot sits at the shoulder with a 0.65-long arm hanging below
+// it, so the hand is at local y ≈ -0.65, and the item is tilted forward out of the fist.
+function attachHeldItemToCharacter(group, itemId) {
+    const ud = group && group.userData;
+    if (!ud || !ud.arms || !ud.arms[1]) return;
+
+    const hand = ud.arms[1];
+    if (ud.heldItem) {
+        hand.remove(ud.heldItem);
+        disposeObject3D(ud.heldItem);
+        ud.heldItem = null;
+    }
+
+    const item = buildHeldItemMesh(itemId);
+    if (!item) return;
+    item.position.set(0, -0.58, -0.06);
+    item.rotation.set(-1.15, 0, 0.12);
+    hand.add(item);
+    ud.heldItem = item;
+}
+
 // A limb is a pivot Group positioned at the joint (shoulder/hip) with its box mesh hanging
 // below, so rotating the pivot swings the limb around the joint instead of its own center.
 function createLimbPivotMesh(w, h, d, mat, jointX, jointY, jointZ) {

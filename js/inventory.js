@@ -284,26 +284,6 @@ class InventorySystem {
         }, 4000);
     }
 
-    // --- Planting --------------------------------------------------------
-    plantSaplingAtTarget() {
-        if ((this.resources.sapling || 0) < 1) {
-            this.game.showToast('⚠️ 심을 묘목이 없습니다! (나뭇잎을 부수면 가끔 획득)');
-            return;
-        }
-        const target = this.game.physics.raycastTarget(6.0);
-        if (!target.hit) { this.game.showToast('⚠️ 심을 위치를 조준해주세요.'); return; }
-        const { x, y, z } = target.placeBlock;
-        if (!inZone(x, z, ZONES.FOREST)) {
-            this.game.showToast('⚠️ 묘목은 숲 구역(서북쪽)에만 심을 수 있습니다!');
-            return;
-        }
-        this.resources.sapling--;
-        this.syncToServer();
-        this.refreshAll();
-        this.game.net.send({ type: 'plant_sapling', x, y, z });
-        this.game.showToast('🌱 묘목을 심었습니다! (약 1분 후 나무로 자랍니다)');
-    }
-
     // --- Fishing -----------------------------------------------------------
     startFishing() {
         if ((this.resources.fishing_rod || 0) < 1) {
@@ -380,9 +360,6 @@ class InventorySystem {
 
         const closeFurnace = document.getElementById('btn-close-furnace');
         if (closeFurnace) closeFurnace.addEventListener('click', () => document.getElementById('furnace-modal').classList.add('hidden'));
-
-        const plantBtn = document.getElementById('btn-plant-sapling');
-        if (plantBtn) plantBtn.addEventListener('click', () => this.plantSaplingAtTarget());
     }
 
     openCrafting() {

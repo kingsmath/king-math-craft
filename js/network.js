@@ -8,6 +8,16 @@ class NetworkManager {
         this.parcelNumber = 1;
         this.myId = null;
 
+        // Block edits are applied locally the instant they're made (so building feels
+        // responsive) and only afterwards confirmed by the server. This keeps the block that
+        // WAS there for every in-flight edit, so a server rejection ('block_denied', e.g. an
+        // indestructible crafting table) can put it straight back instead of leaving the
+        // player looking at a hole that doesn't actually exist. Cleared on confirmation.
+        this.pendingEdits = new Map();
+
+        // Last weapon id broadcast to the room, so held-item updates are only sent on change.
+        this.lastSentWeapon = undefined;
+
         // Available Vibrant Shirt Colors for Random Avatar Clothes (fallback only)
         this.shirtColors = [
             0xef4444, 0xf97316, 0xf59e0b, 0x84cc16, 0x10b981, 0x06b6d4,
@@ -191,6 +201,12 @@ class NetworkManager {
                 this.myAppearance = data.appearance || this.myAppearance;
                 this.game.onLoginAppearance(data.appearance);
 
+                // Announce the weapon restored from the server inventory right away, so a
+                // (re)joining player is holding it for everyone else from the first frame -
+                // sendHeldItem only fires on change, so nothing else would push it.
+                this.lastSentWeapon = undefined;
+                this.sendHeldItem(this.game.inventory ? this.game.inventory.equipment.weapon : null);
+
                 // If host map load prompt required
                 if (data.prompt_host_load) {
                     this.game.showHostLoadModal();
@@ -221,6 +237,7 @@ class NetworkManager {
                 break;
 
             case 'block_changed':
+                this.pendingEdits.delete(`${data.x},${data.y},${data.z}`);
                 this.game.world.setBlock(data.x, data.y, data.z, data.blockType);
                 if (data.blockType === 0) sfx.playBreak();
                 else sfx.playPlace();
@@ -228,6 +245,15 @@ class NetworkManager {
 
             case 'block_denied':
                 this.game.showToast(data.message || '⚠️ 수용할 수 없는 작업입니다.');
+                // Roll the optimistic local edit back, otherwise a rejected break (crafting
+                // table, bedrock, someone else's parcel) still LOOKS broken on this client.
+                if (data.x !== undefined && data.y !== undefined && data.z !== undefined) {
+                    const deniedKey = `${data.x},${data.y},${data.z}`;
+                    if (this.pendingEdits.has(deniedKey)) {
+                        this.game.world.setBlock(data.x, data.y, data.z, this.pendingEdits.get(deniedKey));
+                        this.pendingEdits.delete(deniedKey);
+                    }
+                }
                 break;
 
             case 'reload_world_edits':
@@ -292,6 +318,10 @@ class NetworkManager {
             case 'appearance_changed':
                 this.updateRemotePlayerAppearance(data.id, data.appearance);
                 break;
+
+            case 'held_item_changed':
+                this.setRemotePlayerWeapon(data.id, data.weapon);
+                break;
         }
     }
 
@@ -311,12 +341,28 @@ class NetworkManager {
         const rp = this.remotePlayers.get(id);
         if (!rp || !appearance) return;
         const oldGroup = rp.group;
-        const newGroup = this.createPlayerMesh(rp.playerNumber || 1, id, appearance);
+        const newGroup = this.createPlayerMesh(rp.playerNumber || 1, id, appearance, rp.weapon);
         newGroup.position.copy(oldGroup.position);
         newGroup.rotation.y = oldGroup.rotation.y;
         this.game.scene.remove(oldGroup);
         this.game.scene.add(newGroup);
+        disposeObject3D(oldGroup);
         rp.group = newGroup;
+    }
+
+    setRemotePlayerWeapon(id, weapon) {
+        const rp = this.remotePlayers.get(id);
+        if (!rp) return;
+        rp.weapon = weapon || null;
+        attachHeldItemToCharacter(rp.group, rp.weapon);
+    }
+
+    // Pushed whenever the locally equipped weapon changes, so everyone else sees it in-hand.
+    sendHeldItem(weapon) {
+        const value = weapon || null;
+        if (this.lastSentWeapon === value) return;
+        this.lastSentWeapon = value;
+        this.send({ type: 'held_item_update', weapon: value });
     }
 
     sendBlockChange(x, y, z, blockType) {
@@ -328,7 +374,8 @@ class NetworkManager {
             return false;
         }
 
-        // Local instant update
+        // Local instant update, remembering the old block so a server rejection can undo it
+        this.pendingEdits.set(`${x},${y},${z}`, this.game.world.getBlock(x, y, z));
         this.game.world.setBlock(x, y, z, blockType);
 
         // Send to server (matching server.py format)
@@ -384,7 +431,7 @@ class NetworkManager {
         if (id === this.myId) return;
 
         if (!this.remotePlayers.has(id)) {
-            const meshGroup = this.createPlayerMesh(pData.player_number || 1, id, pData.appearance);
+            const meshGroup = this.createPlayerMesh(pData.player_number || 1, id, pData.appearance, pData.weapon);
             meshGroup.position.set(pData.x || 0, pData.y || 10.0, pData.z || 0);
             this.game.scene.add(meshGroup);
             this.remotePlayers.set(id, {
@@ -393,6 +440,7 @@ class NetworkManager {
                 targetRotY: pData.rotY || 0,
                 playerNumber: pData.player_number || 1,
                 isMoving: pData.isMoving || false,
+                weapon: pData.weapon || null,
                 walkTime: 0
             });
         } else {
@@ -401,6 +449,7 @@ class NetworkManager {
             if (pData.rotY !== undefined) rp.targetRotY = pData.rotY;
             if (pData.isMoving !== undefined) rp.isMoving = pData.isMoving;
             if (pData.appearance) this.updateRemotePlayerAppearance(id, pData.appearance);
+            if (pData.weapon !== undefined) this.setRemotePlayerWeapon(id, pData.weapon);
         }
     }
 
@@ -495,7 +544,8 @@ class NetworkManager {
     }
 
     // Create 3D Minecraft Humanoid Character, colored/shaped per the player's chosen appearance
-    createPlayerMesh(parcelNum, id, appearance) {
+    // (and holding `weapon`, the id of their equipped weapon/tool, in the right hand).
+    createPlayerMesh(parcelNum, id, appearance, weapon) {
         const group = new THREE.Group();
 
         const colorIndex = (typeof id === 'string' ? id.charCodeAt(id.length - 1) : parcelNum) % this.shirtColors.length;
@@ -533,6 +583,7 @@ class NetworkManager {
         group.add(leftLeg, rightLeg);
 
         group.userData = { head, body, legs: [leftLeg, rightLeg], arms: [leftArm, rightArm] };
+        attachHeldItemToCharacter(group, weapon);
 
         // 3D Nickname Tag above head
         const canvas = document.createElement('canvas');
@@ -562,6 +613,7 @@ class NetworkManager {
         if (this.remotePlayers.has(id)) {
             const rp = this.remotePlayers.get(id);
             this.game.scene.remove(rp.group);
+            disposeObject3D(rp.group);
             this.remotePlayers.delete(id);
         }
     }

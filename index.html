@@ -11,7 +11,7 @@
         gtag('js', new Date());
         gtag('config', 'G-5YW0T2C109');
     </script>
-    <title>0.2.9킹수학크래프트</title>
+    <title>0.2.49킹수학크래프트</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -50,6 +50,7 @@
             <div class="btn-group-top">
                 <button id="btn-inventory" class="btn-icon glass-panel" title="인벤토리">🎒</button>
                 <button id="btn-character" class="btn-icon glass-panel" title="캐릭터 꾸미기">👤</button>
+                <button id="btn-view-toggle" class="btn-icon glass-panel" title="시점: 1인칭 (V키로 변경)">👁️</button>
             </div>
 
             <div class="top-right-group">
@@ -87,6 +88,7 @@
                 <li><span class="key">좌클릭</span> 파괴 (몬스터/동물/PVP 상대를 조준하면 공격) / <span class="key">우클릭</span> 설치</li>
                 <li><span class="key">F</span> 제작대·화로·호수 상호작용 (제작/요리/낚시)</li>
                 <li><span class="key">1~9</span> / <span class="key">휠</span> 핫바 9슬롯 선택</li>
+                <li><span class="key">V</span> / <span class="key">👁️ 버튼</span> 시점 전환 (1인칭 ↔ 3인칭 뒤 ↔ 3인칭 앞)</li>
                 <li><span class="key">H</span> / <span class="key">❓ 버튼</span> 조작법 창 열기/닫기</li>
                 <li><span class="key">T</span> / <span class="key">Enter</span> 채팅창 열기, <span class="key">Esc</span> 채팅창 닫기</li>
                 <li>🌙 밤에는 동굴 근처에 몬스터가 출현하고, ☀️ 아침이 되면 동굴 밖 몬스터는 불타 사라집니다.</li>
@@ -107,7 +109,6 @@
             <div id="inventory-resource-grid" class="inv-grid"></div>
             <div class="inv-section-title">장비</div>
             <div id="inventory-equip-grid" class="equip-grid"></div>
-            <button id="btn-plant-sapling" class="btn-primary" style="margin-top:10px;">🌱 조준한 위치에 묘목 심기 (숲 구역)</button>
         </div>
 
         <!-- Crafting Table Modal: 3x3 free-combination grid (Minecraft-style) -->
@@ -240,7 +241,7 @@
             <div class="logo-area">
      
                 <h1>👑킹수학 크래프트</h1>
-                <p class="subtitle">데모버전 0.2.9(202607271204)</p>
+                <p class="subtitle">데모버전 0.2.49(202607271614)</p>
             </div>
 
             <!-- First-Come First-Served Ownership Detailed Guide Alert Box -->

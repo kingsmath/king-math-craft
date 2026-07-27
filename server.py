@@ -117,6 +117,44 @@ PARCEL_CRAFTING_TABLE_CELLS = _build_parcel_crafting_table_cells()
 PROTECTED_STATION_CELLS = BASE_CRAFTING_TABLE_CELLS | BASE_FURNACE_CELLS | PARCEL_CRAFTING_TABLE_CELLS
 
 
+def is_station_at(room, x, y, z):
+    """True if (x,y,z) holds a crafting table / furnace. A recorded edit always wins (that is
+    what the client renders), and otherwise the base-world stations are matched by their fixed
+    coordinate. Mirrors VoxelWorld.getBreakBlockedReason() in js/game.js."""
+    edit = room["active_world_edits"].get(f"{x},{y},{z}")
+    if edit is not None:
+        return edit in (BLOCK_CRAFTING_TABLE, BLOCK_FURNACE)
+    return y == GROUND_SURFACE_Y + 1 and (x, z) in PROTECTED_STATION_CELLS
+
+
+async def deny_block_change(ws, x, y, z, message):
+    """Rejects one block edit. The coordinate is echoed back so the client can undo the
+    optimistic local edit it already applied (see 'block_denied' in js/network.js) instead of
+    leaving behind a hole that doesn't actually exist on the server."""
+    await ws.send_str(json.dumps({
+        "type": "block_denied",
+        "x": x, "y": y, "z": z,
+        "message": message
+    }))
+
+
+def sanitize_world_edits(edits):
+    """Drops any saved edit that would erase a base-world crafting station or dig out the floor
+    tile holding one up. Rooms saved before those cells became protected can still carry such
+    an edit, and re-applying it on load would delete the station all over again."""
+    cleaned = {}
+    for key, block_type in edits.items():
+        try:
+            x, y, z = (int(v) for v in key.split(","))
+        except (ValueError, AttributeError):
+            cleaned[key] = block_type
+            continue
+        if block_type == 0 and (x, z) in PROTECTED_STATION_CELLS and y in (GROUND_SURFACE_Y, GROUND_SURFACE_Y + 1):
+            continue
+        cleaned[key] = block_type
+    return cleaned
+
+
 SAPLING_GROW_SECONDS = 60
 ORE_RESPAWN_SECONDS = 75
 
@@ -241,7 +279,7 @@ def load_rooms_data():
                         "password_hash": r_data.get("password_hash"),
                         "last_active": last_active,
                         "game_mode": r_data.get("game_mode", "survival"),
-                        "saved_world_edits": r_data.get("world_edits", {}),
+                        "saved_world_edits": sanitize_world_edits(r_data.get("world_edits", {})),
                         "parcel_passwords": r_data.get("parcel_passwords", {}),
                         "active_world_edits": {},
                         "active_sockets": {},
@@ -770,6 +808,7 @@ async def websocket_handler(request):
                         "hp": 20,
                         "maxHp": 20,
                         "appearance": appearance,
+                        "weapon": None,
                     }
 
                     current_room_key = room_key
@@ -831,7 +870,7 @@ async def websocket_handler(request):
                     load_saved = bool(data.get("load", False))
                     room = rooms.get(current_room_key)
                     if room and load_saved:
-                        room["active_world_edits"] = dict(room.get("saved_world_edits", {}))
+                        room["active_world_edits"] = sanitize_world_edits(room.get("saved_world_edits", {}))
                         print(f"[HOST] Host loaded saved map edits ({len(room['active_world_edits'])} edits)")
 
                         await broadcast_room(room, {
@@ -877,43 +916,29 @@ async def websocket_handler(request):
 
                     # Base Ground Floor (Y <= 4) is Unbreakable!
                     if y <= 4 and block_type == 0:
-                        await ws.send_str(json.dumps({
-                            "type": "block_denied",
-                            "message": "⚠️ 가장 바닥 잔디/지형은 파괴할 수 없습니다!"
-                        }))
+                        await deny_block_change(ws, x, y, z, "⚠️ 가장 바닥 잔디/지형은 파괴할 수 없습니다!")
                         continue
 
                     # Crafting stations cannot be broken: base-world ones (craft plaza + each
                     # parcel's pre-placed table) are matched by fixed coordinate, since they're
                     # never recorded in active_world_edits until someone edits them; player-
                     # *placed* ones (via the crafting-table item) are matched by their recorded edit.
-                    existing_key = f"{x},{y},{z}"
-                    is_base_station = y == GROUND_SURFACE_Y + 1 and (x, z) in PROTECTED_STATION_CELLS
-                    is_placed_station = room["active_world_edits"].get(existing_key) in (BLOCK_CRAFTING_TABLE, BLOCK_FURNACE)
-                    if block_type == 0 and (is_base_station or is_placed_station):
-                        await ws.send_str(json.dumps({
-                            "type": "block_denied",
-                            "message": "⚠️ 제작대/화로는 파괴할 수 없습니다!"
-                        }))
+                    if block_type == 0 and is_station_at(room, x, y, z):
+                        await deny_block_change(ws, x, y, z, "⚠️ 제작대/화로는 파괴할 수 없습니다!")
                         continue
 
-                    # Floor tile under each parcel's pre-placed crafting table must stay solid
-                    # too, so the table (already protected above) never ends up floating.
-                    if block_type == 0 and y == GROUND_SURFACE_Y and (x, z) in PARCEL_CRAFTING_TABLE_CELLS:
-                        await ws.send_str(json.dumps({
-                            "type": "block_denied",
-                            "message": "⚠️ 제작대 아래 땅은 파괴할 수 없습니다!"
-                        }))
+                    # The floor tile under ANY crafting station must stay solid too, so the
+                    # station (already protected above) can never end up floating - this covers
+                    # the parcel tables, the craft plaza, and player-placed stations alike.
+                    if block_type == 0 and is_station_at(room, x, y + 1, z):
+                        await deny_block_change(ws, x, y, z, "⚠️ 제작대/화로 아래 땅은 파괴할 수 없습니다!")
                         continue
 
                     parcel = get_parcel_number(x, z)
                     user_num = session_info["player_number"]
 
                     if parcel != 0 and parcel != user_num:
-                        await ws.send_str(json.dumps({
-                            "type": "block_denied",
-                            "message": f"해당 영역은 {parcel}번 플레이어의 개인 영역입니다!"
-                        }))
+                        await deny_block_change(ws, x, y, z, f"해당 영역은 {parcel}번 플레이어의 개인 영역입니다!")
                         continue
 
                     room["last_active"] = time.time()
@@ -1054,6 +1079,23 @@ async def websocket_handler(request):
                             "id": session_info["id"],
                             "appearance": appearance
                         })
+
+                elif msg_type == "held_item_update" and current_room_key and session_info:
+                    # Which weapon/tool this player currently has equipped, so everyone else
+                    # can render it in their character's hand. Purely cosmetic - the damage
+                    # math still comes from the sender's own 'attack_entity'/'attack_player'.
+                    room = rooms.get(current_room_key)
+                    if not room:
+                        continue
+                    weapon = data.get("weapon")
+                    if weapon is not None and not isinstance(weapon, str):
+                        continue
+                    session_info["weapon"] = weapon
+                    await broadcast_room(room, {
+                        "type": "held_item_changed",
+                        "id": session_info["id"],
+                        "weapon": weapon
+                    }, exclude_ws=ws)
 
             elif msg.type == WSMsgType.ERROR:
                 print(f"[WS] Connection error: {ws.exception()}")

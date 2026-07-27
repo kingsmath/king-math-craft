@@ -67,8 +67,71 @@ class VoxelWorld {
         this.materials = [];
         this.parcelMaterials = new Map();
 
+        // Floating "🔨 제작대" name plates, one per crafting-table block, kept in sync by
+        // setBlock() so world-generated, player-placed and server-synced tables all get one.
+        // Must exist before generateWorld() runs, since that places the base-world tables.
+        this.stationLabels = new Map();
+        this.stationLabelGroup = new THREE.Group();
+        this.scene.add(this.stationLabelGroup);
+
         this.initTextures();
         this.generateWorld();
+    }
+
+    // Shared sprite material for every crafting-table name plate (built once, on first use).
+    getStationLabelMaterial() {
+        if (!this._stationLabelMaterial) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(30, 18, 6, 0.78)';
+            ctx.fillRect(0, 0, 256, 64);
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 5;
+            ctx.strokeRect(3, 3, 250, 58);
+            ctx.fillStyle = '#fde68a';
+            ctx.font = 'bold 34px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🔨 제작대', 128, 34);
+            const texture = new THREE.CanvasTexture(canvas);
+            this._stationLabelMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        }
+        return this._stationLabelMaterial;
+    }
+
+    addStationLabel(x, y, z) {
+        const key = this.getKey(x, y, z);
+        if (this.stationLabels.has(key)) return;
+        const sprite = new THREE.Sprite(this.getStationLabelMaterial());
+        sprite.position.set(x + 0.5, y + 1.35, z + 0.5);
+        sprite.scale.set(1.7, 0.42, 1);
+        this.stationLabelGroup.add(sprite);
+        this.stationLabels.set(key, sprite);
+    }
+
+    removeStationLabel(key) {
+        const sprite = this.stationLabels.get(key);
+        if (!sprite) return;
+        this.stationLabelGroup.remove(sprite);
+        this.stationLabels.delete(key);
+    }
+
+    // Crafting stations are indestructible, and so is whatever block is holding one up (else
+    // the table would be left floating). Returns the reason a break must be refused, or null
+    // if the block is fair game. MUST mirror the block_change handler in server.py - this is
+    // just the instant local feedback so a protected block never even flickers.
+    getBreakBlockedReason(x, y, z) {
+        const here = this.getBlock(x, y, z);
+        if (here === BLOCK.CRAFTING_TABLE || here === BLOCK.FURNACE) {
+            return '⚠️ 제작대/화로는 부술 수 없습니다!';
+        }
+        const above = this.getBlock(x, y + 1, z);
+        if (above === BLOCK.CRAFTING_TABLE || above === BLOCK.FURNACE) {
+            return '⚠️ 제작대/화로 아래 바닥은 부술 수 없습니다!';
+        }
+        return null;
     }
 
     initTextures() {
@@ -150,9 +213,64 @@ class VoxelWorld {
         const texGoldOre = createPixelTexture('#fde68a', '#eab308');
         const texDiamondOre = createPixelTexture('#67e8f9', '#06b6d4', false, false, false, true);
         const texSapling = createPixelTexture('#4ade80', '#16a34a');
-        const texCraftingTop = createPixelTexture('#a16207', '#78350f', false, true);
-        const texCraftingSide = createPixelTexture('#92400e', '#78350f', false, true);
         const texFurnace = createPixelTexture('#6b7280', '#374151', false, false, true);
+
+        // Dedicated crafting-table faces so the block actually reads as a workbench at a
+        // glance instead of a plain wooden cube: the 3x3 crafting grid is burned into the
+        // top, the sides carry a saw + hammer over plank rows, and the underside is plain
+        // planks. 32x32 (not 16x16 like the generic blocks) so the grid stays crisp.
+        const createCraftFaceTexture = (draw) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            draw(canvas.getContext('2d'));
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.NearestFilter;
+            return texture;
+        };
+
+        const texCraftingTop = createCraftFaceTexture((ctx) => {
+            ctx.fillStyle = '#8a5a2b';
+            ctx.fillRect(0, 0, 32, 32);
+            ctx.fillStyle = '#6f4520';
+            for (let y = 0; y < 32; y += 8) ctx.fillRect(0, y, 32, 1);
+            ctx.fillStyle = '#4a2a0d'; // recessed grid backing board
+            ctx.fillRect(3, 3, 26, 26);
+            ctx.fillStyle = '#d9b45b'; // the 9 crafting cells
+            for (let gx = 0; gx < 3; gx++) {
+                for (let gy = 0; gy < 3; gy++) ctx.fillRect(5 + gx * 8, 5 + gy * 8, 6, 6);
+            }
+            ctx.strokeStyle = '#3f2408';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(1, 1, 30, 30);
+        });
+
+        const texCraftingSide = createCraftFaceTexture((ctx) => {
+            ctx.fillStyle = '#7a4a1e';
+            ctx.fillRect(0, 0, 32, 32);
+            ctx.fillStyle = '#633a15';
+            for (let y = 6; y < 32; y += 7) ctx.fillRect(0, y, 32, 2);
+            ctx.fillStyle = '#4a2a0d'; // tabletop edge band
+            ctx.fillRect(0, 0, 32, 6);
+            ctx.fillStyle = '#cbd5e1'; // saw blade
+            ctx.fillRect(4, 11, 17, 3);
+            ctx.fillStyle = '#94a3b8';
+            for (let x = 4; x < 21; x += 3) ctx.fillRect(x, 14, 2, 2);
+            ctx.fillStyle = '#3f2408'; // saw grip
+            ctx.fillRect(21, 10, 6, 3);
+            ctx.fillStyle = '#9ca3af'; // hammer head
+            ctx.fillRect(19, 21, 9, 5);
+            ctx.fillStyle = '#3f2408'; // hammer handle
+            ctx.fillRect(7, 23, 12, 2);
+        });
+
+        const texCraftingBottom = createCraftFaceTexture((ctx) => {
+            ctx.fillStyle = '#6b3f16';
+            ctx.fillRect(0, 0, 32, 32);
+            ctx.fillStyle = '#54300f';
+            for (let y = 0; y < 32; y += 8) ctx.fillRect(0, y, 32, 2);
+        });
         const texFence = createPixelTexture('#92400e', '#5c3a21', false, true);
         const texFlower = createPixelTexture('#fb7185', '#22c55e');
 
@@ -193,11 +311,12 @@ class VoxelWorld {
         this.materials[BLOCK.GOLD_ORE] = new THREE.MeshStandardMaterial({ map: texGoldOre, emissive: 0xeab308, emissiveIntensity: 0.15 });
         this.materials[BLOCK.DIAMOND_ORE] = new THREE.MeshStandardMaterial({ map: texDiamondOre, emissive: 0x06b6d4, emissiveIntensity: 0.25 });
         this.materials[BLOCK.SAPLING] = new THREE.MeshStandardMaterial({ map: texSapling, transparent: true, opacity: 0.85 });
+        // BoxGeometry face order: +X, -X, +Y (top), -Y (bottom), +Z, -Z
         this.materials[BLOCK.CRAFTING_TABLE] = [
             new THREE.MeshStandardMaterial({ map: texCraftingSide }),
             new THREE.MeshStandardMaterial({ map: texCraftingSide }),
             new THREE.MeshStandardMaterial({ map: texCraftingTop }),
-            new THREE.MeshStandardMaterial({ map: texCraftingTop }),
+            new THREE.MeshStandardMaterial({ map: texCraftingBottom }),
             new THREE.MeshStandardMaterial({ map: texCraftingSide }),
             new THREE.MeshStandardMaterial({ map: texCraftingSide }),
         ];
@@ -333,6 +452,9 @@ class VoxelWorld {
         } else {
             this.blocks.set(key, blockType);
         }
+        // Keep the floating "제작대" name plates in lockstep with the actual blocks
+        if (blockType === BLOCK.CRAFTING_TABLE) this.addStationLabel(x, y, z);
+        else this.removeStationLabel(key);
         // Skip incremental tracking during bulk world generation - a single computeAllExposure()
         // pass at the end is far cheaper than tens of thousands of redundant incremental updates.
         if (!this._bulkGenerating) {
@@ -861,6 +983,11 @@ class MinecraftGame {
 
         this.selectedSlot = 1;
 
+        // Camera view mode: 0 = first person, 1 = third person behind, 2 = third person front.
+        // Cycled with the 👁️ top-bar button or the V key (see cycleCameraMode()).
+        this.cameraMode = 0;
+        this.localAvatar = null;
+
         // Touch Drag Camera Vars
         this.touchPreviousX = 0;
         this.touchPreviousY = 0;
@@ -887,8 +1014,114 @@ class MinecraftGame {
         this.initCharacterCustomization();
         this.initRoomIdCheck();
         this.initViewmodelArm();
+        this.initViewToggle();
         this.initInviteFeature();
         this.applyJoinLinkPrefill();
+    }
+
+    // ==================================================================
+    // Camera view modes (1인칭 / 3인칭 뒤 / 3인칭 앞)
+    // ==================================================================
+    initViewToggle() {
+        const btn = document.getElementById('btn-view-toggle');
+        if (btn) btn.addEventListener('click', () => this.cycleCameraMode());
+        this.refreshViewToggleButton();
+    }
+
+    refreshViewToggleButton() {
+        const btn = document.getElementById('btn-view-toggle');
+        if (!btn) return;
+        const icons = ['👁️', '🎥', '🤳'];
+        const titles = ['시점: 1인칭 (V키로 변경)', '시점: 3인칭 뒤에서 보기 (V키로 변경)', '시점: 3인칭 앞에서 보기 (V키로 변경)'];
+        btn.innerText = icons[this.cameraMode];
+        btn.title = titles[this.cameraMode];
+    }
+
+    cycleCameraMode() {
+        this.cameraMode = (this.cameraMode + 1) % 3;
+        this.refreshViewToggleButton();
+        const labels = ['👁️ 1인칭 시점', '🎥 3인칭 시점 (뒤에서 보기)', '🤳 3인칭 시점 (앞에서 보기)'];
+        this.showToast(labels[this.cameraMode]);
+    }
+
+    // The local player's own character, only built once a third-person view is actually used.
+    // Rebuilt whenever the appearance or the equipped weapon changes, matching how remote
+    // player meshes are handled (see NetworkManager.updateRemotePlayerAppearance).
+    ensureLocalAvatar() {
+        const weapon = this.inventory ? this.inventory.equipment.weapon : null;
+        const signature = JSON.stringify(this.appearance || {}) + '|' + weapon + '|' + this.physics.playerNumber;
+        if (this.localAvatar && this._localAvatarSignature === signature) return this.localAvatar;
+
+        if (this.localAvatar) {
+            this.scene.remove(this.localAvatar);
+            disposeObject3D(this.localAvatar);
+        }
+        this.localAvatar = this.net.createPlayerMesh(this.physics.playerNumber, this.net.myId || 'me', this.appearance, weapon);
+        this._localAvatarSignature = signature;
+        this.scene.add(this.localAvatar);
+        return this.localAvatar;
+    }
+
+    // How far the third-person camera can pull away from the eye along `dir` before it would
+    // clip into terrain, so the view never ends up stuck inside a wall.
+    cameraDistanceBeforeWall(eye, dir, maxDistance) {
+        const step = 0.15;
+        for (let d = step; d <= maxDistance; d += step) {
+            const bx = Math.floor(eye.x + dir.x * d);
+            const by = Math.floor(eye.y + dir.y * d);
+            const bz = Math.floor(eye.z + dir.z * d);
+            const block = this.world.getBlock(bx, by, bz);
+            if (block !== 0 && block !== BLOCK.WATER) return Math.max(0.6, d - step * 1.5);
+        }
+        return maxDistance;
+    }
+
+    updateCameraView(delta, eyePos) {
+        const thirdPerson = this.cameraMode !== 0;
+        if (this.viewmodelArm) this.viewmodelArm.visible = !thirdPerson;
+
+        if (!thirdPerson) {
+            if (this.localAvatar) this.localAvatar.visible = false;
+            this.camera.position.copy(eyePos);
+            this.camera.rotation.y = this.physics.rotation.y;
+            this.camera.rotation.x = this.physics.rotation.x;
+            return;
+        }
+
+        // Own character, standing at the physics position and facing the look direction
+        const avatar = this.ensureLocalAvatar();
+        avatar.visible = true;
+        avatar.position.set(this.physics.position.x, this.physics.position.y, this.physics.position.z);
+        avatar.rotation.y = this.physics.rotation.y;
+
+        const isWalking = this.physics.keys.forward || this.physics.keys.backward || this.physics.keys.left || this.physics.keys.right;
+        this._avatarWalkTime = isWalking ? (this._avatarWalkTime || 0) + delta * 9.0 : 0;
+        const swing = Math.sin(this._avatarWalkTime) * 0.55;
+        const ud = avatar.userData || {};
+        if (ud.legs) {
+            ud.legs[0].rotation.x = swing;
+            ud.legs[1].rotation.x = -swing;
+        }
+        if (ud.arms) {
+            ud.arms[0].rotation.x = -swing;
+            ud.arms[1].rotation.x = swing;
+        }
+        if (ud.head) ud.head.rotation.x = this.physics.rotation.x;
+
+        // Behind-the-shoulder (mode 1) pulls back along the look ray; the front view (mode 2)
+        // pulls the opposite way and turns the camera around to face the character.
+        const behind = this.cameraMode === 1;
+        const look = this.physics.getLookVector();
+        const dir = new THREE.Vector3(look.x, look.y, look.z).multiplyScalar(behind ? -1 : 1);
+        const dist = this.cameraDistanceBeforeWall(eyePos, dir, 4.2);
+
+        this.camera.position.set(
+            eyePos.x + dir.x * dist,
+            eyePos.y + dir.y * dist + 0.15,
+            eyePos.z + dir.z * dist
+        );
+        this.camera.rotation.y = this.physics.rotation.y + (behind ? 0 : Math.PI);
+        this.camera.rotation.x = behind ? this.physics.rotation.x : -this.physics.rotation.x;
     }
 
     // First-person view-model arm attached to the camera (visible only to the local player)
@@ -909,6 +1142,32 @@ class MinecraftGame {
         if (this.viewmodelArm && this.appearance) {
             this.viewmodelArm.material.color.set(this.appearance.skin || '#ffdbac');
         }
+    }
+
+    // Keeps the equipped weapon/tool visible in the first-person hand, and tells the room
+    // about it so every other player sees it in this character's hand too. Called every
+    // frame but only does real work when the equipped item actually changed.
+    syncHeldItem() {
+        const weapon = this.inventory ? this.inventory.equipment.weapon : null;
+        if (weapon === this._heldItemId) return;
+        this._heldItemId = weapon;
+
+        if (this.viewmodelItem) {
+            this.viewmodelArm.remove(this.viewmodelItem);
+            disposeObject3D(this.viewmodelItem);
+            this.viewmodelItem = null;
+        }
+        // Held inside the fist at the bottom of the arm, tilted up-and-forward so the blade
+        // reads clearly against the world instead of pointing straight at the sky.
+        const item = buildHeldItemMesh(weapon);
+        if (item && this.viewmodelArm) {
+            item.position.set(0, -0.2, -0.05);
+            item.rotation.set(-1.15, 0.1, 0.2);
+            this.viewmodelArm.add(item);
+            this.viewmodelItem = item;
+        }
+
+        this.net.sendHeldItem(weapon);
     }
 
     // Safety net: bedrock (y=4) should always block falling further down, but if anything ever
@@ -1299,25 +1558,7 @@ class MinecraftGame {
         // Break Block / Attack Button (Bottom-Right)
         bindTapAction(document.getElementById('btn-touch-break'), () => {
             if (this.inventory.attemptAttack()) return;
-            const target = this.physics.raycastTarget(6.0);
-            if (target.hit) {
-                const { x, y, z } = target.targetBlock;
-                if (y <= 4) {
-                    this.showToast('⚠️ 가장 바닥 지형은 파괴할 수 없습니다!');
-                    return;
-                }
-                const MathX = Math.round(x);
-                const MathY = Math.round(y);
-                const MathZ = Math.round(z);
-                let brokenType = this.world.getBlock(MathX, MathY, MathZ);
-                if (!brokenType) brokenType = this.world.getBlock(x, y, z);
-
-                if (this.net.sendBlockChange(x, y, z, 0)) {
-                    // Fallback to WOOD (4) if breaking a tree trunk block that was set via generator
-                    if (!brokenType) brokenType = 4;
-                    this.inventory.grantFromBlockBreak(brokenType);
-                }
-            }
+            this.tryBreakAimedBlock();
         });
 
         // Place Block Button (Bottom-Right)
@@ -1551,6 +1792,11 @@ class MinecraftGame {
                 this.inventory.handleInteract();
             }
 
+            // 'V' key cycles 1인칭 -> 3인칭(뒤) -> 3인칭(앞)
+            if (e.code === 'KeyV' && !e.repeat) {
+                this.cycleCameraMode();
+            }
+
             // Escape cancels an armed placement (crafting table/furnace waiting to be placed)
             if (e.code === 'Escape' && this.inventory.pendingPlacement) {
                 this.inventory.pendingPlacement = null;
@@ -1601,22 +1847,7 @@ class MinecraftGame {
             const target = this.physics.raycastTarget(6.0);
             if (target.hit) {
                 if (e.button === 0) {
-                    const { x, y, z } = target.targetBlock;
-                    if (y <= 4) {
-                        this.showToast('⚠️ 가장 바닥 지형은 파괴할 수 없습니다!');
-                        return;
-                    }
-                    const MathX = Math.round(x);
-                    const MathY = Math.round(y);
-                    const MathZ = Math.round(z);
-                    let brokenType = this.world.getBlock(MathX, MathY, MathZ);
-                    if (!brokenType) brokenType = this.world.getBlock(x, y, z);
-
-                    if (this.net.sendBlockChange(x, y, z, 0)) {
-                        // Fallback to WOOD (4) if breaking a tree trunk block that was set via generator
-                        if (!brokenType) brokenType = 4;
-                        this.inventory.grantFromBlockBreak(brokenType);
-                    }
+                    this.tryBreakAimedBlock(target);
                 } else if (e.button === 2) {
                     const { x, y, z } = target.placeBlock;
                     const p = this.physics.position;
@@ -1743,6 +1974,35 @@ class MinecraftGame {
         }, 3500);
     }
 
+    // Breaks the block under the crosshair (shared by the desktop left-click and the mobile
+    // ⛏️ button). Refuses bedrock and crafting stations up-front so a protected block never
+    // even flickers out locally before the server rejects the edit.
+    tryBreakAimedBlock(preTarget) {
+        const target = preTarget || this.physics.raycastTarget(6.0);
+        if (!target.hit) return;
+
+        const { x, y, z } = target.targetBlock;
+        if (y <= 4) {
+            this.showToast('⚠️ 가장 바닥 지형은 파괴할 수 없습니다!');
+            return;
+        }
+
+        const blockedReason = this.world.getBreakBlockedReason(x, y, z);
+        if (blockedReason) {
+            this.showToast(blockedReason);
+            return;
+        }
+
+        let brokenType = this.world.getBlock(Math.round(x), Math.round(y), Math.round(z));
+        if (!brokenType) brokenType = this.world.getBlock(x, y, z);
+
+        if (this.net.sendBlockChange(x, y, z, 0)) {
+            // Fallback to WOOD (4) if breaking a tree trunk block that was set via generator
+            if (!brokenType) brokenType = 4;
+            this.inventory.grantFromBlockBreak(brokenType);
+        }
+    }
+
     // Places a block at (x,y,z), preferring a crafted placeable item (crafting table/furnace)
     // armed via InventorySystem.armPlacement() over the normal 9-slot hotbar selection.
     placeBlockAt(x, y, z) {
@@ -1809,6 +2069,8 @@ class MinecraftGame {
         this.physics.update(delta);
         this.checkFallRecovery();
 
+        this.syncHeldItem();
+
         if (this.viewmodelArm) {
             const isWalking = this.physics.keys.forward || this.physics.keys.backward || this.physics.keys.left || this.physics.keys.right;
             const swing = isWalking && this.physics.onGround ? Math.sin(this.physics.bobTimer) * 0.3 : 0;
@@ -1821,10 +2083,7 @@ class MinecraftGame {
 
         this.camera.rotation.order = 'YXZ';
 
-        // Locked to First-Person View (Human Perspective)
-        this.camera.position.copy(eyePos);
-        this.camera.rotation.y = this.physics.rotation.y;
-        this.camera.rotation.x = this.physics.rotation.x;
+        this.updateCameraView(delta, eyePos);
 
         const target = this.physics.raycastTarget(6.0);
         if (target.hit) {
