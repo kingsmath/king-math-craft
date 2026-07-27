@@ -1043,30 +1043,53 @@ body, html {
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    padding: 8px 6px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    color: #fff;
+    padding: 10px 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    color: var(--text-muted);
     cursor: pointer;
     transition: all 0.15s ease;
+    position: relative;
 }
 
-.mode-btn:hover { background: rgba(59, 130, 246, 0.4); }
+.mode-btn:hover { border-color: rgba(255, 255, 255, 0.4); background: rgba(255, 255, 255, 0.09); }
 
-.mode-btn-title { font-size: 13px; font-weight: 800; }
+.mode-btn-title { font-size: 13px; font-weight: 800; color: #fff; }
 .mode-btn-desc { font-size: 10px; color: var(--text-muted); }
 
-.mode-btn.selected {
-    background: var(--accent-gold);
-    border-color: #f59e0b;
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+/* Each mode gets its own theme color so the two buttons read as distinct choices even before
+   picking one, and the selected one clearly "lights up" in that color. */
+#mode-btn-survival.selected {
+    background: rgba(239, 68, 68, 0.28);
+    border-color: var(--danger);
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.6);
 }
 
-.mode-btn.selected .mode-btn-title { color: #0f172a; }
-.mode-btn.selected .mode-btn-desc { color: #422006; }
+#mode-btn-creative.selected {
+    background: rgba(34, 197, 94, 0.28);
+    border-color: var(--accent-green);
+    box-shadow: 0 0 14px rgba(34, 197, 94, 0.6);
+}
 
-.mode-selector-row.locked .mode-btn:not(.selected) { opacity: 0.4; }
+.mode-btn.selected {
+    transform: scale(1.04);
+}
+
+.mode-btn.selected .mode-btn-title { color: #fff; }
+.mode-btn.selected .mode-btn-desc { color: #f1f5f9; }
+
+.mode-btn.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 3px;
+    right: 6px;
+    font-size: 12px;
+    font-weight: 900;
+    color: #fff;
+}
+
+.mode-selector-row.locked .mode-btn:not(.selected) { opacity: 0.35; }
 .mode-btn:disabled { cursor: not-allowed; }
 
 #mode-badge {

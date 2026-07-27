@@ -79,6 +79,10 @@ const RECIPES = {
     diamond_chest: { name: '👕 다이아몬드 흉갑', icon: '👕', cost: { diamond: 5 }, category: 'armor', equipSlot: 'chest', defense: 0.20 },
     diamond_legs: { name: '👖 다이아몬드 각반', icon: '👖', cost: { diamond: 4 }, category: 'armor', equipSlot: 'legs', defense: 0.16 },
     diamond_boots: { name: '🥾 다이아몬드 부츠', icon: '🥾', cost: { diamond: 2 }, category: 'armor', equipSlot: 'boots', defense: 0.09 },
+    // placeableBlock uses plain numeric BLOCK ids (28=CRAFTING_TABLE, 29=FURNACE) - same reason
+    // as BLOCK_DROP_MAP above: this file loads before game.js defines the BLOCK registry.
+    crafting_table: { name: '🔨 제작대', icon: '🔨', cost: { wood: 4 }, category: 'block', placeableBlock: 28 },
+    furnace: { name: '🔥 화로', icon: '🔥', cost: { stone: 8 }, category: 'block', placeableBlock: 29 },
 };
 
 const FOODS = {
@@ -112,6 +116,11 @@ class InventorySystem {
         // drain/starvation and treat every resource as unlimited (see hasResources/tick below).
         this.creative = false;
         this.craftGrid = new Array(9).fill(null); // 3x3 free-combination crafting grid state
+
+        // Set while a crafted placeable item (crafting table, furnace) is "armed" from the
+        // inventory panel, waiting for the next place-block click to consume it - see
+        // armPlacement() and MinecraftGame.placeBlockAt().
+        this.pendingPlacement = null;
 
         this.initUI();
     }
@@ -184,6 +193,21 @@ class InventorySystem {
         this.equipment[slot] = null;
         this.syncToServer();
         this.refreshAll();
+    }
+
+    // Arms a crafted placeable item (crafting table / furnace) for the next place-block action.
+    // MinecraftGame.placeBlockAt() consumes it once the player actually places a block.
+    armPlacement(itemId) {
+        const r = RECIPES[itemId];
+        if (!r || !r.placeableBlock) return;
+        if (!this.creative && (this.resources[itemId] || 0) < 1) {
+            this.game.showToast('⚠️ 설치할 아이템이 없습니다!');
+            return;
+        }
+        this.pendingPlacement = { itemId, blockType: r.placeableBlock, name: r.name };
+        this.game.showToast(`📍 ${r.name} 설치할 위치를 조준하고 설치(우클릭/🧱버튼)하세요! (Esc로 취소)`);
+        const invPanel = document.getElementById('inventory-panel');
+        if (invPanel) invPanel.classList.add('hidden');
     }
 
     getWeaponDamage() {
@@ -592,9 +616,12 @@ class InventorySystem {
                 const cell = document.createElement('div');
                 cell.className = 'inv-cell';
                 cell.innerHTML = `<div class="inv-icon">${icon}</div><div class="inv-qty">${qty}</div><div class="inv-name">${name}</div>` +
-                    (recipe && recipe.equipSlot ? `<button class="btn-equip">${this.equipment[recipe.equipSlot] === key ? '장착됨' : '장착'}</button>` : '');
+                    (recipe && recipe.equipSlot ? `<button class="btn-equip">${this.equipment[recipe.equipSlot] === key ? '장착됨' : '장착'}</button>` : '') +
+                    (recipe && recipe.placeableBlock ? `<button class="btn-craft btn-place-item">📍 설치하기</button>` : '');
                 const equipBtn = cell.querySelector('.btn-equip');
                 if (equipBtn) equipBtn.addEventListener('click', () => { this.equip(key); this.renderInventoryPanel(); });
+                const placeBtn = cell.querySelector('.btn-place-item');
+                if (placeBtn) placeBtn.addEventListener('click', () => this.armPlacement(key));
                 grid.appendChild(cell);
             });
         }

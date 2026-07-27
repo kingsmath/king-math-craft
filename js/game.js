@@ -442,6 +442,7 @@ class VoxelWorld {
 
         this.buildCentralHub(groundHeight);
         this.createParcelSignposts(groundHeight);
+        this.createParcelCraftingTables(groundHeight);
 
         this._bulkGenerating = false;
         this.computeAllExposure();
@@ -700,6 +701,23 @@ class VoxelWorld {
         const furnaces = [[46, 44], [53, 44], [46, 52]];
         tables.forEach(([x, z]) => this.setBlock(x, gy + 1, z, BLOCK.CRAFTING_TABLE, false));
         furnaces.forEach(([x, z]) => this.setBlock(x, gy + 1, z, BLOCK.FURNACE, false));
+    }
+
+    // One dedicated crafting table per personal parcel, 2 blocks in from its entrance/signpost
+    // (away from the plaza), so nobody has to walk to the shared craft plaza or gather wood to
+    // craft one themselves. Direction-per-side mirrors the signpost-facing logic below exactly.
+    // The floor tile under each of these is protected server-side (block_change handler in
+    // server.py) so it can never be dug out from underneath.
+    createParcelCraftingTables(gy) {
+        Object.entries(PARCEL_SPAWN_POINTS).forEach(([numStr, p]) => {
+            const num = parseInt(numStr, 10);
+            let x = p.x, z = p.z;
+            if (num >= 1 && num <= 8) z -= 2;        // North parcels: into the parcel is -Z
+            else if (num >= 9 && num <= 16) x += 2;  // East parcels: +X
+            else if (num >= 17 && num <= 24) z += 2; // South parcels: +Z
+            else x -= 2;                             // West parcels (25-32): -X
+            this.setBlock(x, gy + 1, z, BLOCK.CRAFTING_TABLE, false);
+        });
     }
 
     createParcelSignposts(groundHeight) {
@@ -1307,7 +1325,7 @@ class MinecraftGame {
             const target = this.physics.raycastTarget(6.0);
             if (target.hit) {
                 const { x, y, z } = target.placeBlock;
-                this.net.sendBlockChange(x, y, z, this.selectedSlot);
+                this.placeBlockAt(x, y, z);
             }
         });
 
@@ -1533,6 +1551,12 @@ class MinecraftGame {
                 this.inventory.handleInteract();
             }
 
+            // Escape cancels an armed placement (crafting table/furnace waiting to be placed)
+            if (e.code === 'Escape' && this.inventory.pendingPlacement) {
+                this.inventory.pendingPlacement = null;
+                this.showToast('❌ 설치를 취소했습니다.');
+            }
+
             if (e.code === 'KeyT' || e.code === 'Enter') {
                 if (chatForm.classList.contains('hidden')) {
                     chatForm.classList.remove('hidden');
@@ -1603,7 +1627,7 @@ class MinecraftGame {
                     if (!(x >= Math.floor(minX) && x <= Math.floor(maxX) &&
                           y >= Math.floor(minY) && y <= Math.floor(maxY) &&
                           z >= Math.floor(minZ) && z <= Math.floor(maxZ))) {
-                        this.net.sendBlockChange(x, y, z, this.selectedSlot);
+                        this.placeBlockAt(x, y, z);
                     }
                 }
             }
@@ -1717,6 +1741,30 @@ class MinecraftGame {
         this.toastTimer = setTimeout(() => {
             toast.classList.add('hidden');
         }, 3500);
+    }
+
+    // Places a block at (x,y,z), preferring a crafted placeable item (crafting table/furnace)
+    // armed via InventorySystem.armPlacement() over the normal 9-slot hotbar selection.
+    placeBlockAt(x, y, z) {
+        const pending = this.inventory.pendingPlacement;
+        if (!pending) {
+            this.net.sendBlockChange(x, y, z, this.selectedSlot);
+            return;
+        }
+        if (!this.inventory.creative && (this.inventory.resources[pending.itemId] || 0) < 1) {
+            this.showToast('⚠️ 설치할 아이템이 없습니다!');
+            this.inventory.pendingPlacement = null;
+            return;
+        }
+        if (this.net.sendBlockChange(x, y, z, pending.blockType)) {
+            if (!this.inventory.creative) {
+                this.inventory.resources[pending.itemId] = (this.inventory.resources[pending.itemId] || 0) - 1;
+                this.inventory.syncToServer();
+                this.inventory.refreshAll();
+            }
+            this.showToast(`✅ ${pending.name} 설치 완료!`);
+        }
+        this.inventory.pendingPlacement = null;
     }
 
     selectSlot(slotNum) {

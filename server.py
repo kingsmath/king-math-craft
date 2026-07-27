@@ -79,6 +79,44 @@ def get_parcel_spawn_point(player_num):
     return {"x": coords[0] + 0.5, "y": 10.0, "z": coords[1] + 0.5}
 
 
+# Ground surface layer (world Y) that every column's floor tile sits on - MUST mirror
+# `groundHeight` in js/game.js VoxelWorld.generateWorld().
+GROUND_SURFACE_Y = 9
+
+# Base-world-generated crafting table / furnace columns in the shared craft plaza - MUST mirror
+# the `tables`/`furnaces` arrays in VoxelWorld.buildCraftPlaza() in js/game.js exactly.
+BASE_CRAFTING_TABLE_CELLS = {(43, 44), (50, 44), (43, 52), (50, 52)}
+BASE_FURNACE_CELLS = {(46, 44), (53, 44), (46, 52)}
+
+
+def _build_parcel_crafting_table_cells():
+    """(x,z) of each parcel's pre-placed crafting table - 2 blocks into the parcel from its
+    entrance/signpost, away from the plaza. MUST mirror createParcelCraftingTables() in
+    js/game.js exactly."""
+    cells = set()
+    for num, (px, pz) in PARCEL_SPAWN_POINTS.items():
+        x, z = px, pz
+        if 1 <= num <= 8:
+            z -= 2
+        elif 9 <= num <= 16:
+            x += 2
+        elif 17 <= num <= 24:
+            z += 2
+        else:
+            x -= 2
+        cells.add((x, z))
+    return cells
+
+
+PARCEL_CRAFTING_TABLE_CELLS = _build_parcel_crafting_table_cells()
+
+# All base-world-generated crafting table / furnace columns, at world Y = GROUND_SURFACE_Y + 1.
+# These are baked into procedural generation, not stored as a per-room world_edit diff, so they
+# need their own always-protected coordinate set - the active_world_edits-based check further
+# below only catches stations a player explicitly *placed* (and so has a recorded edit).
+PROTECTED_STATION_CELLS = BASE_CRAFTING_TABLE_CELLS | BASE_FURNACE_CELLS | PARCEL_CRAFTING_TABLE_CELLS
+
+
 SAPLING_GROW_SECONDS = 60
 ORE_RESPAWN_SECONDS = 75
 
@@ -845,12 +883,26 @@ async def websocket_handler(request):
                         }))
                         continue
 
-                    # Public crafting stations cannot be broken
+                    # Crafting stations cannot be broken: base-world ones (craft plaza + each
+                    # parcel's pre-placed table) are matched by fixed coordinate, since they're
+                    # never recorded in active_world_edits until someone edits them; player-
+                    # *placed* ones (via the crafting-table item) are matched by their recorded edit.
                     existing_key = f"{x},{y},{z}"
-                    if block_type == 0 and room["active_world_edits"].get(existing_key) in (BLOCK_CRAFTING_TABLE, BLOCK_FURNACE):
+                    is_base_station = y == GROUND_SURFACE_Y + 1 and (x, z) in PROTECTED_STATION_CELLS
+                    is_placed_station = room["active_world_edits"].get(existing_key) in (BLOCK_CRAFTING_TABLE, BLOCK_FURNACE)
+                    if block_type == 0 and (is_base_station or is_placed_station):
                         await ws.send_str(json.dumps({
                             "type": "block_denied",
-                            "message": "⚠️ 공용 제작대/화로는 파괴할 수 없습니다!"
+                            "message": "⚠️ 제작대/화로는 파괴할 수 없습니다!"
+                        }))
+                        continue
+
+                    # Floor tile under each parcel's pre-placed crafting table must stay solid
+                    # too, so the table (already protected above) never ends up floating.
+                    if block_type == 0 and y == GROUND_SURFACE_Y and (x, z) in PARCEL_CRAFTING_TABLE_CELLS:
+                        await ws.send_str(json.dumps({
+                            "type": "block_denied",
+                            "message": "⚠️ 제작대 아래 땅은 파괴할 수 없습니다!"
                         }))
                         continue
 
