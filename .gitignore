@@ -1,0 +1,11 @@
+# Runtime room data (contains hashed passwords/PINs and player inventories)
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Env / secrets
+.env

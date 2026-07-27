@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Google Analytics (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5YW0T2C109"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-5YW0T2C109');
+    </script>
+    <title>0.2.8킹수학크래프트</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Three.js 3D Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container">
+        <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- UI Overlay (Game Mode) -->
+    <div id="game-ui" class="hidden">
+        <!-- Crosshair -->
+        <div id="crosshair">+</div>
+
+        <!-- Top Header Bar -->
+        <div id="top-bar">
+            <div class="top-left-group">
+                <button id="btn-fullscreen" class="btn-icon glass-panel" title="전체화면">⛶</button>
+                <button id="btn-toggle-controls" class="btn-icon glass-panel" title="조작법">❓</button>
+                <div id="room-badge" class="glass-panel">
+                    <span id="display-room-name">수학방</span>
+                    <span class="divider">|</span>
+                    <span id="display-my-number" class="highlight">1번</span>
+                    <span class="divider">|</span>
+                    <span id="mode-badge">⚔️ 서바이벌</span>
+                </div>
+                <button id="btn-invite" class="btn-invite glass-panel" title="친구 초대하기">초대</button>
+            </div>
+
+            <!-- Header Action Buttons -->
+            <div class="btn-group-top">
+                <button id="btn-inventory" class="btn-icon glass-panel" title="인벤토리">🎒</button>
+                <button id="btn-character" class="btn-icon glass-panel" title="캐릭터 꾸미기">👤</button>
+            </div>
+
+            <div class="top-right-group">
+                <div id="daynight-clock" class="glass-panel">☀️ 06:00</div>
+                <div id="scoreboard" class="glass-panel">
+                    <span class="status-dot"></span>
+                    <span id="player-count-badge">1 / 32</span>
+                    <ul id="player-list"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- HP / Hunger Status Bars (Bottom Center, above hotbar) -->
+        <div id="status-bars">
+            <div class="status-bar-row">
+                <span id="hp-bar-label" class="status-bar-label">❤️ 20/20</span>
+                <div class="status-bar-track"><div id="hp-bar-fg" class="status-bar-fg hp"></div></div>
+            </div>
+            <div class="status-bar-row">
+                <span id="hunger-bar-label" class="status-bar-label">🍗 20/20</span>
+                <div class="status-bar-track"><div id="hunger-bar-fg" class="status-bar-fg hunger"></div></div>
+            </div>
+        </div>
+
+        <!-- Top Header Controls Dropdown Panel -->
+        <div id="controls-dropdown" class="glass-panel hidden">
+            <div class="dropdown-header">
+                <span class="dropdown-title">🎮 게임 조작법</span>
+                <button id="btn-close-dropdown" class="btn-close">❌ 닫기</button>
+            </div>
+            <ul class="dropdown-controls-list">
+                <li><span class="key">WASD</span> / <span class="key">터치 조이스틱</span> 이동</li>
+                <li><span class="key">Space</span> 점프 / <span class="key">Ctrl</span> 달리기 / <span class="key">Shift</span> 숙이기</li>
+                <li><span class="key">E</span> / <span class="key">I</span> / <span class="key">🎒 버튼</span> 인벤토리(가방) 열기/닫기</li>
+                <li><span class="key">좌클릭</span> 파괴 (몬스터/동물/PVP 상대를 조준하면 공격) / <span class="key">우클릭</span> 설치</li>
+                <li><span class="key">F</span> 제작대·화로·호수 상호작용 (제작/요리/낚시)</li>
+                <li><span class="key">1~9</span> / <span class="key">휠</span> 핫바 9슬롯 선택</li>
+                <li><span class="key">H</span> / <span class="key">❓ 버튼</span> 조작법 창 열기/닫기</li>
+                <li><span class="key">T</span> / <span class="key">Enter</span> 채팅창 열기, <span class="key">Esc</span> 채팅창 닫기</li>
+                <li>🌙 밤에는 동굴 근처에 몬스터가 출현하고, ☀️ 아침이 되면 동굴 밖 몬스터는 불타 사라집니다.</li>
+                <li>⚔️ PVP 아레나(남동쪽) 안에서만 서로 공격할 수 있습니다.</li>
+            </ul>
+        </div>
+
+        <!-- Notification Toast Message -->
+        <div id="toast-notify" class="toast hidden"></div>
+
+        <!-- Inventory Panel -->
+        <div id="inventory-panel" class="glass-panel hidden">
+            <div class="dropdown-header">
+                <span class="dropdown-title">🎒 인벤토리</span>
+                <button id="btn-close-inventory" class="btn-close">❌ 닫기</button>
+            </div>
+            <div class="inv-section-title">보유 자원 / 아이템</div>
+            <div id="inventory-resource-grid" class="inv-grid"></div>
+            <div class="inv-section-title">장비</div>
+            <div id="inventory-equip-grid" class="equip-grid"></div>
+            <button id="btn-plant-sapling" class="btn-primary" style="margin-top:10px;">🌱 조준한 위치에 묘목 심기 (숲 구역)</button>
+        </div>
+
+        <!-- Crafting Table Modal: 3x3 free-combination grid (Minecraft-style) -->
+        <div id="crafting-modal" class="modal-overlay hidden">
+            <div class="login-card glass-card craft-grid-card">
+                <div class="dropdown-header">
+                    <span class="dropdown-title">🔨 제작대</span>
+                    <button id="btn-close-crafting" class="btn-close">❌ 닫기</button>
+                </div>
+                <p class="craft-grid-hint">보유 자원을 클릭해 3x3 칸에 채운 뒤, 알려진 조합과 합이 맞으면 결과 칸을 눌러 제작하세요.</p>
+                <div class="craft-grid-layout">
+                    <div class="craft-grid-3x3" id="craft-grid-3x3"></div>
+                    <div class="craft-grid-arrow">➜</div>
+                    <div class="craft-output-slot" id="craft-output-slot" title="결과물을 눌러 제작"></div>
+                </div>
+                <div class="craft-section-title">🎒 보유 자원 (클릭해서 칸에 배치)</div>
+                <div id="craft-palette" class="craft-palette"></div>
+                <div class="craft-section-title">📖 알려진 조합 (클릭하면 그리드에 자동으로 채워줘요)</div>
+                <div id="craft-recipe-guide" class="craft-list"></div>
+            </div>
+        </div>
+
+        <!-- Furnace Modal -->
+        <div id="furnace-modal" class="modal-overlay hidden">
+            <div class="login-card glass-card">
+                <div class="dropdown-header">
+                    <span class="dropdown-title">🔥 화로</span>
+                    <button id="btn-close-furnace" class="btn-close">❌ 닫기</button>
+                </div>
+                <div id="furnace-list" class="craft-list"></div>
+                <div id="furnace-eat-list" class="craft-list"></div>
+            </div>
+        </div>
+
+        <!-- Character Customization Modal -->
+        <div id="character-modal" class="modal-overlay hidden">
+            <div class="login-card glass-card">
+                <div class="dropdown-header">
+                    <span class="dropdown-title">👤 캐릭터 꾸미기</span>
+                    <button id="btn-close-character" class="btn-close">❌ 닫기</button>
+                </div>
+                <div class="input-group">
+                    <label>피부색</label>
+                    <div id="swatch-skin" class="swatch-row"></div>
+                </div>
+                <div class="input-group">
+                    <label>상의 색</label>
+                    <div id="swatch-shirt" class="swatch-row"></div>
+                </div>
+                <div class="input-group">
+                    <label>하의 색</label>
+                    <div id="swatch-pants" class="swatch-row"></div>
+                </div>
+                <div class="input-group">
+                    <label>헤어스타일</label>
+                    <div id="swatch-hair" class="swatch-row"></div>
+                </div>
+                <div class="input-group">
+                    <label>표정</label>
+                    <div id="swatch-expression" class="swatch-row"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invite Friend Modal (QR Code) -->
+        <div id="invite-modal" class="modal-overlay hidden">
+            <div class="login-card glass-card">
+                <div class="dropdown-header">
+                    <span class="dropdown-title">📨 친구 초대하기</span>
+                    <button id="btn-close-invite" class="btn-close">❌ 닫기</button>
+                </div>
+                <p class="invite-desc">이 QR코드를 스캔하거나 링크에 접속하면 방 아이디·비밀번호가 자동으로 입력됩니다. 번호와 번호 비밀번호만 정하면 바로 입장할 수 있어요!</p>
+                <div id="invite-qr-wrap"><img id="invite-qr-img" alt="초대 QR코드" width="220" height="220"></div>
+                <div class="invite-link-row">
+                    <input type="text" id="invite-link-input" readonly>
+                    <button id="btn-copy-invite" class="btn-primary" style="padding:10px 16px;">📋 복사</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Overlay (Bottom Left) -->
+        <div id="chat-container">
+            <div id="chat-history"></div>
+            <form id="chat-form" class="hidden">
+                <input type="text" id="chat-input" placeholder="메시지를 입력하세요 (Enter 전송)..." maxlength="100" autocomplete="off">
+            </form>
+        </div>
+
+        <!-- Traditional 9-Slot Hotbar (Bottom Center) -->
+        <div id="hotbar" class="glass-panel">
+            <div class="hotbar-slot active" data-slot="1"><span class="slot-num">1</span><div class="icon dirt"></div><span class="slot-name">흙</span></div>
+            <div class="hotbar-slot" data-slot="2"><span class="slot-num">2</span><div class="icon grass"></div><span class="slot-name">잔디</span></div>
+            <div class="hotbar-slot" data-slot="3"><span class="slot-num">3</span><div class="icon stone"></div><span class="slot-name">돌</span></div>
+            <div class="hotbar-slot" data-slot="4"><span class="slot-num">4</span><div class="icon wood"></div><span class="slot-name">나무</span></div>
+            <div class="hotbar-slot" data-slot="5"><span class="slot-num">5</span><div class="icon leaves"></div><span class="slot-name">나뭇잎</span></div>
+            <div class="hotbar-slot" data-slot="6"><span class="slot-num">6</span><div class="icon brick"></div><span class="slot-name">벽돌</span></div>
+            <div class="hotbar-slot" data-slot="7"><span class="slot-num">7</span><div class="icon glass"></div><span class="slot-name">유리</span></div>
+            <div class="hotbar-slot" data-slot="8"><span class="slot-num">8</span><div class="icon glowstone"></div><span class="slot-name">발광석</span></div>
+            <div class="hotbar-slot" data-slot="9"><span class="slot-num">9</span><div class="icon diamond"></div><span class="slot-name">다이아</span></div>
+        </div>
+
+        <!-- Mobile & Tablet Touch Controls (Floating Joystick Zone + Bottom Right Action Buttons) -->
+        <div id="touch-controls">
+            <!-- Left-side touch zone: joystick base spawns wherever the finger first lands -->
+            <div id="joystick-zone">
+                <div id="joystick-container">
+                    <div id="joystick-base">
+                        <div id="joystick-knob"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Right Action Touch Buttons -->
+            <div id="touch-actions">
+                <button id="btn-touch-break" class="touch-btn action-btn btn-break" title="파괴/공격">🔨</button>
+                <button id="btn-touch-place" class="touch-btn action-btn btn-place" title="설치">🧱</button>
+                <button id="btn-touch-interact" class="touch-btn action-btn btn-interact" title="상호작용">✋</button>
+                <button id="btn-touch-jump" class="touch-btn action-btn btn-jump" title="점프">⬆️</button>
+                <button id="btn-touch-sprint" class="touch-btn action-btn btn-sprint" title="달리기">🏃</button>
+            </div>
+        </div>
+
+        <!-- Floating Nickname Tags Container -->
+        <div id="nametags-container"></div>
+    </div>
+
+    <!-- Login Modal (Landing Screen) -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="login-card glass-card">
+            <div class="logo-area">
+     
+                <h1>👑킹수학 크래프트</h1>
+                <p class="subtitle">데모버전 0.2.8(202607241645)</p>
+            </div>
+
+            <!-- First-Come First-Served Ownership Detailed Guide Alert Box -->
+            <div class="purge-warning-box">
+                <span class="warning-icon">📢</span>
+                <div class="warning-text">
+                    <strong>회원가입 없는 선점 방식 안내 (먼저 만든 사람이 임자!)</strong>
+                    <ul class="login-guide-list">
+                        <li>🔑 <strong>방 아이디 & 방 비밀번호</strong>: 원하는 방 이름을 먼저 만든 사람이 해당 방의 주인이 됩니다.</li>
+                        <li>🚩 <strong>선택한 번호 비밀번호</strong>: 1번~32번 땅 중 원하는 번호를 먼저 비밀번호로 설정하면 본인 전용 땅이 됩니다.</li>
+                        <li class="warn-strong">🚫 <strong>아이디/비밀번호 찾기(복구) 기능은 제공되지 않습니다.</strong> 잊어버리면 방/땅을 되찾을 방법이 없으니 꼭 기억해주세요!</li>
+                        <li class="warn-strong">⏳ <strong>마지막 접속 후 30일이 지나면 방 데이터가 자동 삭제됩니다.</strong></li>
+                    </ul>
+                </div>
+            </div>
+
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="username">방 아이디 (ID)</label>
+                    <input type="text" id="username" placeholder="4글자 이상 입력하세요" required autofocus minlength="4" maxlength="15" autocomplete="username">
+                    <span id="room-id-status" class="room-id-status"></span>
+                </div>
+
+                <div class="input-group">
+                    <label for="password">방 비밀번호 (PW)</label>
+                    <input type="password" id="password" placeholder="방 비밀번호를 입력하세요" required autocomplete="current-password">
+                </div>
+
+                <!-- Game Mode Selector (only decided when a room is first created; fixed after that) -->
+                <div class="input-group mode-selector-section">
+                    <label class="section-label">게임 모드 <span class="sub-label">(방을 처음 만들 때만 선택, 이후 고정)</span></label>
+                    <div id="mode-selector-row" class="mode-selector-row">
+                        <button type="button" id="mode-btn-survival" class="mode-btn selected" data-mode="survival">
+                            <span class="mode-btn-title">⚔️ 서바이벌</span>
+                            <span class="mode-btn-desc">배고픔·HP·몬스터 있음</span>
+                        </button>
+                        <button type="button" id="mode-btn-creative" class="mode-btn" data-mode="creative">
+                            <span class="mode-btn-title">🛠️ 크리에이티브</span>
+                            <span class="mode-btn-desc">무한자원·비행·무적</span>
+                        </button>
+                    </div>
+                    <span id="mode-status" class="room-id-status"></span>
+                    <input type="hidden" id="selected-mode" value="survival">
+                </div>
+
+                <!-- 1~32 Player Number Grid Selector (Pre-rendered for Instant Loading) -->
+                <div class="number-selector-section">
+                    <label class="section-label">몇 번인가요? (1번~32번 땅 클릭 선택)</label>
+                    <div class="number-legend"><span class="legend-dot free"></span> 새 번호 <span class="legend-dot taken"></span> 이미 등록된 번호</div>
+                    <div id="number-grid" class="number-grid">
+                        <button type="button" class="num-btn selected" data-num="1">1번</button>
+                        <button type="button" class="num-btn" data-num="2">2번</button>
+                        <button type="button" class="num-btn" data-num="3">3번</button>
+                        <button type="button" class="num-btn" data-num="4">4번</button>
+                        <button type="button" class="num-btn" data-num="5">5번</button>
+                        <button type="button" class="num-btn" data-num="6">6번</button>
+                        <button type="button" class="num-btn" data-num="7">7번</button>
+                        <button type="button" class="num-btn" data-num="8">8번</button>
+                        <button type="button" class="num-btn" data-num="9">9번</button>
+                        <button type="button" class="num-btn" data-num="10">10번</button>
+                        <button type="button" class="num-btn" data-num="11">11번</button>
+                        <button type="button" class="num-btn" data-num="12">12번</button>
+                        <button type="button" class="num-btn" data-num="13">13번</button>
+                        <button type="button" class="num-btn" data-num="14">14번</button>
+                        <button type="button" class="num-btn" data-num="15">15번</button>
+                        <button type="button" class="num-btn" data-num="16">16번</button>
+                        <button type="button" class="num-btn" data-num="17">17번</button>
+                        <button type="button" class="num-btn" data-num="18">18번</button>
+                        <button type="button" class="num-btn" data-num="19">19번</button>
+                        <button type="button" class="num-btn" data-num="20">20번</button>
+                        <button type="button" class="num-btn" data-num="21">21번</button>
+                        <button type="button" class="num-btn" data-num="22">22번</button>
+                        <button type="button" class="num-btn" data-num="23">23번</button>
+                        <button type="button" class="num-btn" data-num="24">24번</button>
+                        <button type="button" class="num-btn" data-num="25">25번</button>
+                        <button type="button" class="num-btn" data-num="26">26번</button>
+                        <button type="button" class="num-btn" data-num="27">27번</button>
+                        <button type="button" class="num-btn" data-num="28">28번</button>
+                        <button type="button" class="num-btn" data-num="29">29번</button>
+                        <button type="button" class="num-btn" data-num="30">30번</button>
+                        <button type="button" class="num-btn" data-num="31">31번</button>
+                        <button type="button" class="num-btn" data-num="32">32번</button>
+                    </div>
+                    <input type="hidden" id="selected-number" value="1">
+                </div>
+
+                <div class="input-group" style="margin-top: 4px;">
+                    <label for="parcel-pin" style="color: #38bdf8;">선택한 번호 비밀번호 <span class="sub-label">(처음 설정시 기억 필수!)</span></label>
+                    <input type="password" id="parcel-pin" placeholder="숫자 비밀번호 입력 (예: 1234)" required maxlength="20" autocomplete="off">
+                    <span id="parcel-status" class="room-id-status"></span>
+                </div>
+
+                <div id="login-error" class="error-msg hidden"></div>
+
+                <div class="login-actions-row">
+                    <button type="button" id="btn-login" class="btn-primary">
+                        <span>월드 입장</span>
+                        <svg class="btn-arrow-icon" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+                    <a id="other-games-link" href="https://킹수학.com" title="다른 게임 고르기">🎮 다른 게임</a>
+                </div>
+            </form>
+
+            <div class="server-info-badge">
+                <span class="pulse-dot"></span>
+                <span>방당 인원: <strong>최대 32명</strong> | 중앙 거실 + 32개 15x15 개인 땅</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Host Load Map Prompt Modal -->
+    <div id="host-modal" class="modal-overlay hidden">
+        <div class="login-card glass-card">
+            <div class="logo-area">
+                <div class="crown-logo">📜</div>
+                <h2>지도 불러오기</h2>
+                <p class="subtitle">방장(첫 접속자) 전용 권한</p>
+            </div>
+            <div class="modal-body-text">
+                이전에 저장된 지도가 있습니다.<br>저장된 지도를 불러오시겠습니까?
+            </div>
+            <div class="btn-row">
+                <button id="btn-load-yes" class="btn-primary"><span>지도 불러오기</span></button>
+                <button id="btn-load-no" class="btn-secondary"><span>새 지도 시작</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Immediate Global Script for Number Grid Selector -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const hiddenInput = document.getElementById('selected-number');
+            const buttons = document.querySelectorAll('.num-btn');
+            
+            buttons.forEach(function(btn) {
+                function select() {
+                    buttons.forEach(function(b) { b.classList.remove('selected'); });
+                    btn.classList.add('selected');
+                    if (hiddenInput) hiddenInput.value = btn.getAttribute('data-num');
+                }
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    select();
+                });
+                btn.addEventListener('touchstart', function(e) {
+                    select();
+                }, { passive: true });
+            });
+        });
+    </script>
+
+    <!-- Scripts -->
+    <script src="js/audio.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/network.js"></script>
+    <script src="js/daynight.js"></script>
+    <script src="js/entities.js"></script>
+    <script src="js/inventory.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

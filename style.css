@@ -1,0 +1,1173 @@
+/* 킹수학크래프트 Modern Glassmorphism & High-Contrast Design System */
+
+:root {
+    --bg-dark: #0f172a;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --accent-gold: #f59e0b;
+    --accent-green: #22c55e;
+    --danger: #ef4444;
+    --glass-bg: rgba(15, 23, 42, 0.75);
+    --glass-border: rgba(255, 255, 255, 0.15);
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #000;
+    color: var(--text-main);
+}
+
+#canvas-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+#game-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-card {
+    background: rgba(30, 41, 59, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* UI Overlay Layer */
+#game-ui {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+}
+
+#game-ui * {
+    pointer-events: auto;
+}
+
+/* Crosshair */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 24px;
+    font-weight: 300;
+    pointer-events: none;
+    text-shadow: 0 0 4px rgba(0,0,0,0.8);
+}
+
+/* Top Bar & Header Buttons */
+#top-bar {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    right: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+}
+
+.top-left-group, .top-right-group {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+#room-badge {
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.divider {
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.highlight {
+    color: #38bdf8;
+}
+
+/* Top Header Buttons */
+.btn-group-top {
+    display: flex;
+    gap: 3px;
+}
+
+.btn-icon {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(59, 130, 246, 0.4);
+    color: #fff;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.btn-icon:hover {
+    background: rgba(59, 130, 246, 0.8);
+    transform: translateY(-2px);
+}
+
+.btn-invite {
+    height: 34px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.3);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.btn-invite:hover {
+    background: rgba(245, 158, 11, 0.7);
+    transform: translateY(-2px);
+}
+
+/* Invite Modal */
+.invite-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+#invite-qr-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+    background: #fff;
+    border-radius: 12px;
+}
+
+#invite-qr-wrap img {
+    display: block;
+    width: 220px;
+    height: 220px;
+}
+
+.invite-link-row {
+    display: flex;
+    gap: 8px;
+}
+
+#invite-link-input {
+    flex: 1;
+    padding: 10px 12px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
+#scoreboard {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background-color: var(--accent-green);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent-green);
+}
+
+#player-list {
+    list-style: none;
+    margin-top: 6px;
+    max-height: 100px;
+    overflow-y: auto;
+    font-size: 13px;
+}
+
+#player-list li {
+    padding: 3px 0;
+    color: #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Controls Dropdown Overlay (Top Center Header Dropdown) */
+#controls-dropdown {
+    position: absolute;
+    top: 75px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 380px;
+    max-width: 92vw;
+    padding: 16px 20px;
+    z-index: 50;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.dropdown-title {
+    font-weight: 800;
+    color: var(--accent-gold);
+    font-size: 15px;
+}
+
+.btn-close {
+    background: rgba(239, 68, 68, 0.3);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #fff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-close:hover {
+    background: rgba(239, 68, 68, 0.7);
+}
+
+.dropdown-controls-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    color: #e2e8f0;
+}
+
+.key {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #fff;
+    font-weight: 700;
+}
+
+/* Toast Notifications */
+.toast {
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid var(--accent-gold);
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 14px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    z-index: 20;
+    transition: all 0.3s ease;
+}
+
+/* Traditional 9-Slot Hotbar */
+#hotbar {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: rgba(15, 23, 42, 0.85);
+    /* Must sit above the joystick-zone/touch-actions touch-catchers (z-index 14/15) - the
+       joystick zone covers the bottom-left 55% of the screen and the hotbar is centered, so
+       without this the joystick swallows touches meant for the left/center hotbar slots. */
+    z-index: 17;
+    touch-action: none;
+}
+
+.hotbar-slot {
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.hotbar-slot.active {
+    border-color: var(--accent-gold);
+    background: rgba(245, 158, 11, 0.15);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+    transform: scale(1.08);
+}
+
+.slot-num {
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--text-muted);
+}
+
+.hotbar-slot.active .slot-num {
+    color: var(--accent-gold);
+}
+
+.icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    margin-top: 2px;
+}
+
+.icon.dirt { background: #8B5A2B; border: 1px solid #5c3a21; }
+.icon.grass { background: #4CAF50; border: 1px solid #2E7D32; }
+.icon.stone { background: #808080; border: 1px solid #555555; }
+.icon.wood { background: #8B4513; border: 1px solid #5c3a21; }
+.icon.leaves { background: #2E8B57; border: 1px solid #1b5e20; }
+.icon.brick { background: #B22222; border: 1px solid #800000; }
+.icon.glass { background: #e0f2fe; border: 1px solid #bae6fd; opacity: 0.8; }
+.icon.glowstone { background: #fde047; border: 1px solid #eab308; }
+.icon.diamond { background: #00ffff; border: 1px solid #0284c7; }
+
+.slot-name {
+    font-size: 10px;
+    margin-top: 2px;
+    color: #cbd5e1;
+    font-weight: 600;
+}
+
+/* Touch Controls Overlay - Bottom Left Joystick & Bottom Right Actions Grid */
+#touch-controls {
+    display: block; /* Always enabled for mobile/tablet & touch devices */
+}
+
+/* Large invisible touch-catcher: joystick spawns wherever the finger first lands here */
+#joystick-zone {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 55%;
+    height: 55%;
+    z-index: 14;
+    touch-action: none;
+}
+
+/* Floating joystick: repositioned via JS left/top on each touchstart, hidden between touches */
+#joystick-container {
+    position: fixed;
+    width: 120px;
+    height: 120px;
+    z-index: 15;
+    touch-action: none;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+#joystick-container.active {
+    opacity: 1;
+}
+
+#joystick-base {
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.18);
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+#joystick-knob {
+    width: 50px;
+    height: 50px;
+    background: rgba(59, 130, 246, 0.85);
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+    transition: transform 0.05s ease-out;
+}
+
+#touch-actions {
+    position: absolute;
+    bottom: 52px; /* cleared above the center-bottom compact hotbar */
+    right: 4px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+    z-index: 15;
+}
+
+.touch-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    font-weight: 800;
+    font-size: 22px;
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.btn-break { background: rgba(239, 68, 68, 0.65); }
+.btn-place { background: rgba(34, 197, 94, 0.65); }
+.btn-interact { background: rgba(245, 158, 11, 0.65); }
+.btn-jump { background: rgba(59, 130, 246, 0.65); }
+.btn-sprint { background: rgba(168, 85, 247, 0.65); grid-column: span 2; width: auto; border-radius: 24px; }
+.btn-sprint.active {
+    background: rgba(168, 85, 247, 0.95);
+    border-color: #f59e0b;
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.8);
+}
+
+/* Chat Box */
+#chat-container {
+    position: absolute;
+    bottom: 90px;
+    left: 20px;
+    width: 320px;
+    z-index: 12;
+}
+
+#chat-history {
+    max-height: 140px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.chat-item {
+    background: rgba(15, 23, 42, 0.7);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.chat-item .sender {
+    color: var(--accent-gold);
+    font-weight: 700;
+    margin-right: 6px;
+}
+
+#chat-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    color: #fff;
+    outline: none;
+}
+
+/* Modal Overlay & Login Card */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    padding: 16px;
+}
+
+.login-card {
+    width: 460px;
+    max-width: 95vw;
+    padding: 26px 24px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 95vh;
+    overflow-y: auto;
+}
+
+.logo-area .crown-logo {
+    font-size: 36px;
+}
+
+.logo-area h1 {
+    font-size: 24px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.purge-warning-box {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    gap: 10px;
+    text-align: left;
+    font-size: 12px;
+}
+
+.login-guide-list {
+    margin-top: 4px;
+    padding-left: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: #cbd5e1;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+}
+
+.input-group label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.sub-label {
+    font-size: 11px;
+    font-weight: 400;
+    color: #94a3b8;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.input-group input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.room-id-status {
+    font-size: 12px;
+    font-weight: 700;
+    min-height: 14px;
+}
+
+.room-id-status.warn { color: #f59e0b; }
+.room-id-status.checking { color: var(--text-muted); }
+.room-id-status.info { color: #38bdf8; }
+.room-id-status.ok { color: var(--accent-green); }
+.room-id-status.taken { color: #fb923c; }
+
+.warn-strong {
+    color: #fca5a5;
+}
+
+.number-legend {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+.legend-dot.free { background: rgba(255, 255, 255, 0.15); margin-left: 0; }
+.legend-dot.taken { background: #f97316; }
+
+/* Pre-rendered 32 Parcel Number Grid */
+.number-selector-section {
+    text-align: left;
+}
+
+.section-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-gold);
+    margin-bottom: 6px;
+    display: block;
+}
+
+.number-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 4px;
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.num-btn {
+    padding: 6px 0;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.num-btn:hover {
+    background: rgba(59, 130, 246, 0.4);
+}
+
+.num-btn.selected {
+    background: var(--accent-gold);
+    color: #0f172a;
+    border-color: #f59e0b;
+    font-weight: 900;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+/* Already-registered land numbers, shown once the room id has been looked up */
+.num-btn.registered {
+    background: rgba(249, 115, 22, 0.28);
+    border-color: rgba(249, 115, 22, 0.6);
+    color: #fed7aa;
+}
+
+.num-btn.registered.selected {
+    background: #f97316;
+    border-color: #fb923c;
+    color: #1c0a00;
+}
+
+.btn-primary {
+    padding: 12px 20px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: 800;
+    font-size: 15px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+}
+
+/* Row holding the login button + the "other games" link side by side */
+.login-actions-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.login-actions-row #btn-login {
+    flex: 1;
+}
+
+/* "월드 입장하기" Login Button - extra polish with a gold/blue glow pulse */
+#btn-login {
+    padding: 12px 18px;
+    font-size: 16px;
+    letter-spacing: 0.3px;
+    background: linear-gradient(135deg, #2563eb, #3b82f6 55%, #f59e0b);
+    box-shadow: 0 8px 22px rgba(59, 130, 246, 0.45);
+    animation: loginBtnGlow 2.6s ease-in-out infinite;
+}
+
+#btn-login:hover {
+    transform: translateY(-3px) scale(1.015);
+    box-shadow: 0 12px 30px rgba(245, 158, 11, 0.55);
+}
+
+#btn-login:disabled {
+    animation: none;
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+@keyframes loginBtnGlow {
+    0%, 100% { box-shadow: 0 8px 22px rgba(59, 130, 246, 0.45); }
+    50% { box-shadow: 0 10px 28px rgba(245, 158, 11, 0.55); }
+}
+
+.btn-arrow-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+/* "다른 게임 고르기" link, sits beside the login button */
+#other-games-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 0 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+#other-games-link:hover {
+    background: rgba(59, 130, 246, 0.4);
+    border-color: rgba(59, 130, 246, 0.7);
+    transform: translateY(-2px);
+}
+
+/* Day/Night Clock Badge */
+#daynight-clock {
+    padding: 10px 16px;
+    font-weight: 800;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+/* HP / Hunger Status Bars */
+#status-bars {
+    position: absolute;
+    bottom: 52px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 12;
+}
+
+.status-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-bar-label {
+    font-size: 12px;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    min-width: 52px;
+}
+
+.status-bar-track {
+    width: 110px;
+    height: 10px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.status-bar-fg {
+    height: 100%;
+    width: 100%;
+    transition: width 0.25s ease;
+}
+
+.status-bar-fg.hp { background: linear-gradient(90deg, #ef4444, #f87171); }
+.status-bar-fg.hunger { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+/* Inventory Panel */
+#inventory-panel {
+    position: absolute;
+    top: 90px;
+    right: 16px;
+    width: 340px;
+    max-width: 92vw;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 14px 16px;
+    z-index: 40;
+}
+
+.inv-section-title, .craft-section-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--accent-gold);
+    margin: 10px 0 6px;
+}
+
+.inv-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.inv-cell {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 6px 4px;
+    text-align: center;
+}
+
+.inv-icon { font-size: 20px; }
+.inv-qty { font-size: 12px; font-weight: 800; color: #fde047; }
+.inv-name { font-size: 10px; color: #cbd5e1; margin-top: 2px; }
+.inv-empty { grid-column: 1 / -1; font-size: 12px; color: var(--text-muted); text-align: center; padding: 10px 0; }
+
+.equip-grid { display: flex; flex-direction: column; gap: 6px; }
+.equip-cell {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.btn-unequip {
+    background: rgba(239,68,68,0.4);
+    border: 1px solid rgba(239,68,68,0.6);
+    color: #fff;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+/* Crafting / Furnace Lists */
+.craft-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 50vh;
+    overflow-y: auto;
+    margin-top: 8px;
+}
+
+.craft-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1.4fr 0.8fr auto auto;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+}
+
+.craft-name { font-weight: 700; }
+.craft-cost { color: var(--text-muted); font-size: 11px; }
+.craft-owned { color: #60a5fa; font-size: 11px; }
+
+.btn-craft, .btn-equip {
+    background: rgba(34, 197, 94, 0.35);
+    border: 1px solid rgba(34, 197, 94, 0.6);
+    color: #fff;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-craft:disabled, .btn-equip:disabled {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.1);
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+/* Character Customization Swatches */
+.swatch-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.swatch {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 2px solid rgba(255,255,255,0.25);
+    cursor: pointer;
+}
+
+.swatch.selected {
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.7);
+}
+
+.label-swatch {
+    width: auto;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(255,255,255,0.08);
+}
+
+.server-info-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.pulse-dot {
+    width: 6px;
+    height: 6px;
+    background-color: var(--accent-green);
+    border-radius: 50%;
+}
+
+/* Game Mode Selector (Login screen) */
+.mode-selector-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.mode-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mode-btn:hover { background: rgba(59, 130, 246, 0.4); }
+
+.mode-btn-title { font-size: 13px; font-weight: 800; }
+.mode-btn-desc { font-size: 10px; color: var(--text-muted); }
+
+.mode-btn.selected {
+    background: var(--accent-gold);
+    border-color: #f59e0b;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+.mode-btn.selected .mode-btn-title { color: #0f172a; }
+.mode-btn.selected .mode-btn-desc { color: #422006; }
+
+.mode-selector-row.locked .mode-btn:not(.selected) { opacity: 0.4; }
+.mode-btn:disabled { cursor: not-allowed; }
+
+#mode-badge {
+    font-size: 12px;
+    font-weight: 700;
+    color: #fca5a5;
+}
+
+#mode-badge.creative { color: #86efac; }
+
+/* 3x3 Free-Combination Crafting Grid */
+.craft-grid-card { width: 480px; }
+
+.craft-grid-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 4px 0 10px;
+}
+
+.craft-grid-layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+}
+
+.craft-grid-3x3 {
+    display: grid;
+    grid-template-columns: repeat(3, 46px);
+    grid-template-rows: repeat(3, 46px);
+    gap: 5px;
+}
+
+.craft-cell {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    position: relative;
+}
+
+.craft-cell:hover { border-color: var(--primary); }
+
+.craft-cell .craft-cell-qty {
+    position: absolute;
+    bottom: 1px;
+    right: 4px;
+    font-size: 9px;
+    font-weight: 800;
+    color: #60a5fa;
+}
+
+.craft-grid-arrow { font-size: 22px; color: var(--text-muted); }
+
+.craft-output-slot {
+    width: 54px;
+    height: 54px;
+    background: rgba(34, 197, 94, 0.08);
+    border: 2px dashed rgba(34, 197, 94, 0.4);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+.craft-output-slot.ready {
+    background: rgba(34, 197, 94, 0.3);
+    border-style: solid;
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);
+}
+
+.craft-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 22vh;
+    overflow-y: auto;
+}
+
+.craft-palette-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    width: 52px;
+    padding: 5px 2px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.craft-palette-item:hover { border-color: var(--primary); }
+.craft-palette-item .palette-qty { font-size: 9px; color: #60a5fa; }
+.craft-palette-item .palette-name { font-size: 9px; color: var(--text-muted); }
