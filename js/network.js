@@ -61,7 +61,7 @@ class NetworkManager {
         return { exists: false, registered_numbers: [] };
     }
 
-    connect(username, password, parcelPin, playerNum) {
+    connect(username, password, parcelPin, playerNum, gameMode) {
         this.username = username;
         this.password = password;
         this.parcelNumber = playerNum;
@@ -93,7 +93,8 @@ class NetworkManager {
                 username: username,
                 password: password,
                 parcelPin: parcelPin,
-                playerNumber: playerNum
+                playerNumber: playerNum,
+                gameMode: gameMode || 'survival'
             });
         };
 
@@ -160,7 +161,7 @@ class NetworkManager {
                         const [x, y, z] = key.split(',').map(Number);
                         this.game.world.setBlock(x, y, z, blockType, false);
                     });
-                    this.game.world.rebuildAllChunks();
+                    this.game.world.flushDirtyChunks();
                 }
 
                 // Render existing players
@@ -176,6 +177,9 @@ class NetworkManager {
                     const total = (data.existing_players ? data.existing_players.length : 0) + 1;
                     countBadge.innerText = `${total} / 32`;
                 }
+
+                // Game mode (survival/creative) is fixed per-room and decided at creation time
+                if (this.game.applyGameMode) this.game.applyGameMode(data.game_mode);
 
                 // Survival systems init: day/night clock, mobs, inventory, appearance, HP
                 if (this.game.dayNight) this.game.dayNight.init(data.world_start_time, data.day_phase);
@@ -232,7 +236,7 @@ class NetworkManager {
                         const [x, y, z] = key.split(',').map(Number);
                         this.game.world.setBlock(x, y, z, blockType, false);
                     });
-                    this.game.world.rebuildAllChunks();
+                    this.game.world.flushDirtyChunks();
                 }
                 if (data.msg) this.game.showToast(`📜 ${data.msg}`);
                 break;
@@ -259,7 +263,7 @@ class NetworkManager {
                         const [x, y, z] = key.split(',').map(Number);
                         this.game.world.setBlock(x, y, z, blockType, false);
                     });
-                    this.game.world.rebuildAllChunks();
+                    this.game.world.flushDirtyChunks();
                 }
                 break;
 

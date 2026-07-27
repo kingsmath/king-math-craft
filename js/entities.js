@@ -53,20 +53,23 @@ class EntityManager {
 
     spawnOrUpdate(m) {
         let ent = this.entities.get(m.id);
+        // Fish stay at the server's water-surface height; land mobs snap to the actual local
+        // ground height (hills mean that's not always the server's fixed spawn y anymore).
+        const y = (m.type === 'fish') ? m.y : this.game.world.getSurfaceY(m.x, m.z, m.y);
         if (!ent) {
             const group = this.createMesh(m.type);
-            group.position.set(m.x, m.y, m.z);
+            group.position.set(m.x, y, m.z);
             this.game.scene.add(group);
             ent = {
                 type: m.type, hp: m.hp, maxHp: m.maxHp, group,
-                targetPos: new THREE.Vector3(m.x, m.y, m.z),
+                targetPos: new THREE.Vector3(m.x, y, m.z),
                 targetRotY: m.rotY || 0
             };
             this.entities.set(m.id, ent);
         } else {
             ent.hp = m.hp;
             ent.maxHp = m.maxHp;
-            ent.targetPos.set(m.x, m.y, m.z);
+            ent.targetPos.set(m.x, y, m.z);
             ent.targetRotY = m.rotY || 0;
         }
         this.updateHpBar(ent);

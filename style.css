@@ -342,6 +342,11 @@ body, html {
     gap: 2px;
     padding: 2px;
     background: rgba(15, 23, 42, 0.85);
+    /* Must sit above the joystick-zone/touch-actions touch-catchers (z-index 14/15) - the
+       joystick zone covers the bottom-left 55% of the screen and the hotbar is centered, so
+       without this the joystick swallows touches meant for the left/center hotbar slots. */
+    z-index: 17;
+    touch-action: none;
 }
 
 .hotbar-slot {
@@ -1025,3 +1030,144 @@ body, html {
     background-color: var(--accent-green);
     border-radius: 50%;
 }
+
+/* Game Mode Selector (Login screen) */
+.mode-selector-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.mode-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mode-btn:hover { background: rgba(59, 130, 246, 0.4); }
+
+.mode-btn-title { font-size: 13px; font-weight: 800; }
+.mode-btn-desc { font-size: 10px; color: var(--text-muted); }
+
+.mode-btn.selected {
+    background: var(--accent-gold);
+    border-color: #f59e0b;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+.mode-btn.selected .mode-btn-title { color: #0f172a; }
+.mode-btn.selected .mode-btn-desc { color: #422006; }
+
+.mode-selector-row.locked .mode-btn:not(.selected) { opacity: 0.4; }
+.mode-btn:disabled { cursor: not-allowed; }
+
+#mode-badge {
+    font-size: 12px;
+    font-weight: 700;
+    color: #fca5a5;
+}
+
+#mode-badge.creative { color: #86efac; }
+
+/* 3x3 Free-Combination Crafting Grid */
+.craft-grid-card { width: 480px; }
+
+.craft-grid-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 4px 0 10px;
+}
+
+.craft-grid-layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+}
+
+.craft-grid-3x3 {
+    display: grid;
+    grid-template-columns: repeat(3, 46px);
+    grid-template-rows: repeat(3, 46px);
+    gap: 5px;
+}
+
+.craft-cell {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    position: relative;
+}
+
+.craft-cell:hover { border-color: var(--primary); }
+
+.craft-cell .craft-cell-qty {
+    position: absolute;
+    bottom: 1px;
+    right: 4px;
+    font-size: 9px;
+    font-weight: 800;
+    color: #60a5fa;
+}
+
+.craft-grid-arrow { font-size: 22px; color: var(--text-muted); }
+
+.craft-output-slot {
+    width: 54px;
+    height: 54px;
+    background: rgba(34, 197, 94, 0.08);
+    border: 2px dashed rgba(34, 197, 94, 0.4);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+.craft-output-slot.ready {
+    background: rgba(34, 197, 94, 0.3);
+    border-style: solid;
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);
+}
+
+.craft-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 22vh;
+    overflow-y: auto;
+}
+
+.craft-palette-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    width: 52px;
+    padding: 5px 2px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.craft-palette-item:hover { border-color: var(--primary); }
+.craft-palette-item .palette-qty { font-size: 9px; color: #60a5fa; }
+.craft-palette-item .palette-name { font-size: 9px; color: var(--text-muted); }

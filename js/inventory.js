@@ -108,6 +108,11 @@ class InventorySystem {
         this.fishing = { active: false };
         this.activeFurnace = null;
 
+        // Set by MinecraftGame.applyGameMode() right after login - creative rooms skip hunger
+        // drain/starvation and treat every resource as unlimited (see hasResources/tick below).
+        this.creative = false;
+        this.craftGrid = new Array(9).fill(null); // 3x3 free-combination crafting grid state
+
         this.initUI();
     }
 
@@ -161,31 +166,11 @@ class InventorySystem {
     }
 
     hasResources(cost) {
+        if (this.creative) return true;
         return Object.entries(cost).every(([k, v]) => INFINITE_RESOURCES.has(k) || (this.resources[k] || 0) >= v);
     }
 
-    consumeResources(cost) {
-        Object.entries(cost).forEach(([k, v]) => {
-            if (!INFINITE_RESOURCES.has(k)) {
-                this.resources[k] = (this.resources[k] || 0) - v;
-            }
-        });
-    }
-
     // --- Crafting / Equipment -------------------------------------------
-    craft(recipeId) {
-        const r = RECIPES[recipeId];
-        if (!r) return;
-        if (!this.hasResources(r.cost)) {
-            this.game.showToast('⚠️ 재료가 부족합니다!');
-            return;
-        }
-        this.consumeResources(r.cost);
-        this.grantResource(recipeId, 1);
-        this.game.showToast(`🔨 ${r.name} 제작 완료!`);
-        this.renderCraftingList();
-    }
-
     equip(itemId) {
         const r = RECIPES[itemId];
         if (!r || !r.equipSlot) return;
@@ -335,6 +320,7 @@ class InventorySystem {
 
     // --- Hunger tick (called every frame) ---------------------------------
     tick(delta) {
+        if (this.creative) return; // no hunger/starvation in creative mode
         this.hungerAccum += delta;
         if (this.hungerAccum >= 40) {
             this.hungerAccum = 0;
@@ -379,7 +365,7 @@ class InventorySystem {
         const modal = document.getElementById('crafting-modal');
         if (!modal) return;
         modal.classList.remove('hidden');
-        this.renderCraftingList();
+        this.renderCraftingGrid();
     }
 
     openFurnace() {
@@ -389,25 +375,163 @@ class InventorySystem {
         this.renderFurnaceList();
     }
 
-    renderCraftingList() {
-        const list = document.getElementById('crafting-list');
+    // =====================================================================
+    // 3x3 Free-Combination Crafting Grid (Minecraft-style): recipe data/cost math is unchanged
+    // (RECIPES/hasResources above) - only how the player assembles a recipe
+    // changed, from "click a button in a list" to "place raw resources into a 3x3 grid until
+    // the totals match a known recipe". Matching is shapeless: only the summed quantity per
+    // resource matters, not which of the 9 cells it's in ("자유 조합" = free combination).
+    // =====================================================================
+
+    // Moves 1 unit of a resource from the inventory into the grid (first cell with the same
+    // resource, else the first empty cell). Mutates state only - callers re-render afterward.
+    placeInGrid(resourceKey) {
+        const unlimited = this.creative || INFINITE_RESOURCES.has(resourceKey);
+        const owned = unlimited ? Infinity : (this.resources[resourceKey] || 0);
+        if (owned <= 0) return;
+
+        const existing = this.craftGrid.find((c) => c && c.key === resourceKey);
+        if (existing) {
+            existing.qty++;
+        } else {
+            const idx = this.craftGrid.findIndex((c) => c === null);
+            if (idx === -1) { this.game.showToast('⚠️ 조합 칸이 가득 찼습니다!'); return; }
+            this.craftGrid[idx] = { key: resourceKey, qty: 1 };
+        }
+        if (!unlimited) this.resources[resourceKey] = owned - 1;
+    }
+
+    // Returns a grid cell's contents back to the inventory and empties the cell.
+    clearGridCell(index) {
+        const cell = this.craftGrid[index];
+        if (!cell) return;
+        const unlimited = this.creative || INFINITE_RESOURCES.has(cell.key);
+        if (!unlimited) this.resources[cell.key] = (this.resources[cell.key] || 0) + cell.qty;
+        this.craftGrid[index] = null;
+    }
+
+    // Finds the known recipe (if any) whose cost exactly matches the grid's current contents.
+    matchGridRecipe() {
+        const totals = {};
+        this.craftGrid.forEach((cell) => {
+            if (!cell) return;
+            totals[cell.key] = (totals[cell.key] || 0) + cell.qty;
+        });
+        const totalKeys = Object.keys(totals);
+        if (totalKeys.length === 0) return null;
+
+        return Object.keys(RECIPES).find((id) => {
+            const costKeys = Object.keys(RECIPES[id].cost);
+            return costKeys.length === totalKeys.length && costKeys.every((k) => totals[k] === RECIPES[id].cost[k]);
+        }) || null;
+    }
+
+    craftFromGrid() {
+        const recipeId = this.matchGridRecipe();
+        if (!recipeId) return;
+        const r = RECIPES[recipeId];
+        // Ingredients were already deducted from the inventory when placed into the grid, and
+        // the grid's totals exactly equal r.cost (that's how matchGridRecipe found it) - so
+        // completing the craft is just clearing the grid and granting the result.
+        this.craftGrid = new Array(9).fill(null);
+        this.grantResource(recipeId, 1);
+        this.game.showToast(`🔨 ${r.name} 제작 완료!`);
+        this.renderCraftingGrid();
+    }
+
+    // Convenience "recipe book" auto-fill: clicking a reference recipe stages its exact
+    // ingredients into the grid for you, same as Minecraft's recipe book.
+    fillGridForRecipe(recipeId) {
+        const r = RECIPES[recipeId];
+        if (!r) return;
+        if (!this.hasResources(r.cost)) {
+            this.game.showToast('⚠️ 재료가 부족해서 자동으로 채울 수 없습니다!');
+            return;
+        }
+        this.craftGrid.forEach((_, idx) => this.clearGridCell(idx));
+        Object.entries(r.cost).forEach(([key, qty]) => {
+            for (let i = 0; i < qty; i++) this.placeInGrid(key);
+        });
+        this.renderCraftingGrid();
+    }
+
+    renderCraftingGrid() {
+        const gridEl = document.getElementById('craft-grid-3x3');
+        const outputEl = document.getElementById('craft-output-slot');
+        if (!gridEl || !outputEl) return;
+
+        gridEl.innerHTML = '';
+        this.craftGrid.forEach((cell, idx) => {
+            const div = document.createElement('div');
+            div.className = 'craft-cell';
+            if (cell) {
+                const icon = RESOURCE_ICONS[cell.key] || '📦';
+                div.innerHTML = `${icon}<span class="craft-cell-qty">${cell.qty}</span>`;
+            }
+            div.addEventListener('click', () => { this.clearGridCell(idx); this.renderCraftingGrid(); });
+            gridEl.appendChild(div);
+        });
+
+        const recipeId = this.matchGridRecipe();
+        outputEl.onclick = null;
+        if (recipeId) {
+            const r = RECIPES[recipeId];
+            outputEl.innerHTML = r.icon;
+            outputEl.title = `${r.name} - 클릭해서 제작`;
+            outputEl.classList.add('ready');
+            outputEl.onclick = () => this.craftFromGrid();
+        } else {
+            outputEl.innerHTML = '';
+            outputEl.title = '';
+            outputEl.classList.remove('ready');
+        }
+
+        this.renderCraftPalette();
+        this.renderRecipeGuide();
+    }
+
+    renderCraftPalette() {
+        const paletteEl = document.getElementById('craft-palette');
+        if (!paletteEl) return;
+        paletteEl.innerHTML = '';
+
+        let keys;
+        if (this.creative) {
+            keys = Object.keys(RESOURCE_ICONS);
+        } else {
+            const gathered = Object.keys(this.resources).filter((k) => !RECIPES[k] && (this.resources[k] || 0) > 0);
+            keys = Array.from(new Set([...INFINITE_RESOURCES, ...gathered]));
+        }
+
+        keys.forEach((key) => {
+            if (RECIPES[key]) return; // crafted items aren't raw ingredients
+            const icon = RESOURCE_ICONS[key] || '📦';
+            const name = RESOURCE_NAMES[key] || key;
+            const unlimited = this.creative || INFINITE_RESOURCES.has(key);
+            const qty = unlimited ? '♾️' : (this.resources[key] || 0);
+            const item = document.createElement('div');
+            item.className = 'craft-palette-item';
+            item.innerHTML = `<div>${icon}</div><div class="palette-qty">${qty}</div><div class="palette-name">${name}</div>`;
+            item.addEventListener('click', () => { this.placeInGrid(key); this.renderCraftingGrid(); });
+            paletteEl.appendChild(item);
+        });
+    }
+
+    renderRecipeGuide() {
+        const list = document.getElementById('craft-recipe-guide');
         if (!list) return;
         list.innerHTML = '';
         Object.entries(RECIPES).forEach(([id, r]) => {
-            const costStr = Object.entries(r.cost).map(([k, v]) => `${RESOURCE_ICONS[k] || ''}${k} x${v}`).join(', ');
-            const canCraft = this.hasResources(r.cost);
+            const costStr = Object.entries(r.cost).map(([k, v]) => `${RESOURCE_ICONS[k] || ''}${RESOURCE_NAMES[k] || k} x${v}`).join(', ');
             const row = document.createElement('div');
             row.className = 'craft-row';
             row.innerHTML = `
                 <span class="craft-name">${r.name}</span>
                 <span class="craft-cost">${costStr}</span>
                 <span class="craft-owned">보유: ${this.resources[id] || 0}</span>
-                <button class="btn-craft" ${canCraft ? '' : 'disabled'}>제작</button>
-                ${r.equipSlot ? `<button class="btn-equip" ${(this.resources[id] || 0) > 0 ? '' : 'disabled'}>${this.equipment[r.equipSlot] === id ? '장착됨' : '장착'}</button>` : ''}
+                <button class="btn-craft">그리드에 채우기</button>
             `;
-            row.querySelector('.btn-craft').addEventListener('click', () => this.craft(id));
-            const equipBtn = row.querySelector('.btn-equip');
-            if (equipBtn) equipBtn.addEventListener('click', () => { this.equip(id); this.renderCraftingList(); });
+            row.querySelector('.btn-craft').addEventListener('click', () => this.fillGridForRecipe(id));
             list.appendChild(row);
         });
     }
@@ -462,11 +586,15 @@ class InventorySystem {
             // Render collected survival loot & items
             Object.entries(this.resources).forEach(([key, qty]) => {
                 if (!qty || INFINITE_RESOURCES.has(key)) return;
-                const icon = RESOURCE_ICONS[key] || (RECIPES[key] ? RECIPES[key].icon : '📦');
-                const name = RECIPES[key] ? RECIPES[key].name : (FOODS[key] ? FOODS[key].name : (RESOURCE_NAMES[key] || key));
+                const recipe = RECIPES[key];
+                const icon = RESOURCE_ICONS[key] || (recipe ? recipe.icon : '📦');
+                const name = recipe ? recipe.name : (FOODS[key] ? FOODS[key].name : (RESOURCE_NAMES[key] || key));
                 const cell = document.createElement('div');
                 cell.className = 'inv-cell';
-                cell.innerHTML = `<div class="inv-icon">${icon}</div><div class="inv-qty">${qty}</div><div class="inv-name">${name}</div>`;
+                cell.innerHTML = `<div class="inv-icon">${icon}</div><div class="inv-qty">${qty}</div><div class="inv-name">${name}</div>` +
+                    (recipe && recipe.equipSlot ? `<button class="btn-equip">${this.equipment[recipe.equipSlot] === key ? '장착됨' : '장착'}</button>` : '');
+                const equipBtn = cell.querySelector('.btn-equip');
+                if (equipBtn) equipBtn.addEventListener('click', () => { this.equip(key); this.renderInventoryPanel(); });
                 grid.appendChild(cell);
             });
         }
@@ -492,7 +620,7 @@ class InventorySystem {
         const invPanel = document.getElementById('inventory-panel');
         if (invPanel && !invPanel.classList.contains('hidden')) this.renderInventoryPanel();
         const craftModal = document.getElementById('crafting-modal');
-        if (craftModal && !craftModal.classList.contains('hidden')) this.renderCraftingList();
+        if (craftModal && !craftModal.classList.contains('hidden')) this.renderCraftingGrid();
     }
 
     refreshHpBar() {

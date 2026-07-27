@@ -202,6 +202,7 @@ def load_rooms_data():
                         "room_id": r_data.get("room_id"),
                         "password_hash": r_data.get("password_hash"),
                         "last_active": last_active,
+                        "game_mode": r_data.get("game_mode", "survival"),
                         "saved_world_edits": r_data.get("world_edits", {}),
                         "parcel_passwords": r_data.get("parcel_passwords", {}),
                         "active_world_edits": {},
@@ -237,6 +238,7 @@ def save_rooms_data():
                 "room_id": r_data["room_id"],
                 "password_hash": r_data["password_hash"],
                 "last_active": r_data["last_active"],
+                "game_mode": r_data.get("game_mode", "survival"),
                 "world_edits": r_data.get("active_world_edits", r_data.get("saved_world_edits", {})),
                 "parcel_passwords": r_data.get("parcel_passwords", {}),
                 "player_inventories": r_data.get("player_inventories", {}),
@@ -464,6 +466,10 @@ async def _apply_mob_player_damage(room):
 
 
 async def apply_player_damage(room, session_info, dmg):
+    # Creative mode is invulnerable - every damage source (mobs, PVP, starvation) funnels
+    # through this one function, so gating it here is enough to make the rule server-authoritative.
+    if room.get("game_mode") == "creative":
+        return
     session_info["hp"] = clamp(session_info.get("hp", 20) - dmg, 0, session_info.get("maxHp", 20))
     await send_to_id(room, session_info["id"], {"type": "player_hp", "hp": session_info["hp"], "maxHp": session_info.get("maxHp", 20)})
     if session_info["hp"] <= 0:
@@ -643,10 +649,14 @@ async def websocket_handler(request):
                     room_key = f"{room_id}#{pw_hash}"
 
                     if room_key not in rooms:
+                        requested_mode = str(data.get("gameMode", "survival")).strip().lower()
+                        if requested_mode not in ("survival", "creative"):
+                            requested_mode = "survival"
                         rooms[room_key] = {
                             "room_id": room_id,
                             "password_hash": pw_hash,
                             "last_active": time.time(),
+                            "game_mode": requested_mode,
                             "saved_world_edits": {},
                             "parcel_passwords": {},
                             "active_world_edits": {},
@@ -745,6 +755,7 @@ async def websocket_handler(request):
                         "is_host": is_host,
                         "room_id": room_id,
                         "max_players": MAX_PLAYERS_PER_ROOM,
+                        "game_mode": room.get("game_mode", "survival"),
                         "world_edits": room["active_world_edits"],
                         "existing_players": existing_players,
                         "occupied_numbers": list(room["occupied_numbers"]),
@@ -1053,6 +1064,7 @@ async def check_room_handler(request):
             "exists": matched_room is not None,
             "valid_length": len(room_id) >= 4,
             "registered_numbers": registered_numbers,
+            "game_mode": matched_room.get("game_mode", "survival") if matched_room else None,
         },
         headers={"Access-Control-Allow-Origin": "*"}
     )

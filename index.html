@@ -11,7 +11,7 @@
         gtag('js', new Date());
         gtag('config', 'G-5YW0T2C109');
     </script>
-    <title>0.2.8킹수학크래프트</title>
+    <title>0.2.9킹수학크래프트</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,6 +40,8 @@
                     <span id="display-room-name">수학방</span>
                     <span class="divider">|</span>
                     <span id="display-my-number" class="highlight">1번</span>
+                    <span class="divider">|</span>
+                    <span id="mode-badge">⚔️ 서바이벌</span>
                 </div>
                 <button id="btn-invite" class="btn-invite glass-panel" title="친구 초대하기">초대</button>
             </div>
@@ -108,14 +110,23 @@
             <button id="btn-plant-sapling" class="btn-primary" style="margin-top:10px;">🌱 조준한 위치에 묘목 심기 (숲 구역)</button>
         </div>
 
-        <!-- Crafting Table Modal -->
+        <!-- Crafting Table Modal: 3x3 free-combination grid (Minecraft-style) -->
         <div id="crafting-modal" class="modal-overlay hidden">
-            <div class="login-card glass-card">
+            <div class="login-card glass-card craft-grid-card">
                 <div class="dropdown-header">
                     <span class="dropdown-title">🔨 제작대</span>
                     <button id="btn-close-crafting" class="btn-close">❌ 닫기</button>
                 </div>
-                <div id="crafting-list" class="craft-list"></div>
+                <p class="craft-grid-hint">보유 자원을 클릭해 3x3 칸에 채운 뒤, 알려진 조합과 합이 맞으면 결과 칸을 눌러 제작하세요.</p>
+                <div class="craft-grid-layout">
+                    <div class="craft-grid-3x3" id="craft-grid-3x3"></div>
+                    <div class="craft-grid-arrow">➜</div>
+                    <div class="craft-output-slot" id="craft-output-slot" title="결과물을 눌러 제작"></div>
+                </div>
+                <div class="craft-section-title">🎒 보유 자원 (클릭해서 칸에 배치)</div>
+                <div id="craft-palette" class="craft-palette"></div>
+                <div class="craft-section-title">📖 알려진 조합 (클릭하면 그리드에 자동으로 채워줘요)</div>
+                <div id="craft-recipe-guide" class="craft-list"></div>
             </div>
         </div>
 
@@ -229,7 +240,7 @@
             <div class="logo-area">
      
                 <h1>👑킹수학 크래프트</h1>
-                <p class="subtitle">데모버전 0.2.8(202607241645)</p>
+                <p class="subtitle">데모버전 0.2.9(202607271204)</p>
             </div>
 
             <!-- First-Come First-Served Ownership Detailed Guide Alert Box -->
@@ -256,6 +267,23 @@
                 <div class="input-group">
                     <label for="password">방 비밀번호 (PW)</label>
                     <input type="password" id="password" placeholder="방 비밀번호를 입력하세요" required autocomplete="current-password">
+                </div>
+
+                <!-- Game Mode Selector (only decided when a room is first created; fixed after that) -->
+                <div class="input-group mode-selector-section">
+                    <label class="section-label">게임 모드 <span class="sub-label">(방을 처음 만들 때만 선택, 이후 고정)</span></label>
+                    <div id="mode-selector-row" class="mode-selector-row">
+                        <button type="button" id="mode-btn-survival" class="mode-btn selected" data-mode="survival">
+                            <span class="mode-btn-title">⚔️ 서바이벌</span>
+                            <span class="mode-btn-desc">배고픔·HP·몬스터 있음</span>
+                        </button>
+                        <button type="button" id="mode-btn-creative" class="mode-btn" data-mode="creative">
+                            <span class="mode-btn-title">🛠️ 크리에이티브</span>
+                            <span class="mode-btn-desc">무한자원·비행·무적</span>
+                        </button>
+                    </div>
+                    <span id="mode-status" class="room-id-status"></span>
+                    <input type="hidden" id="selected-mode" value="survival">
                 </div>
 
                 <!-- 1~32 Player Number Grid Selector (Pre-rendered for Instant Loading) -->

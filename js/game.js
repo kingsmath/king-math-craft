@@ -25,6 +25,9 @@ function inZone(x, z, zone) {
     return x >= zone[0] && x <= zone[1] && z >= zone[2] && z <= zone[3];
 }
 
+// Tree spacing (blocks) in the forest zone - larger = fewer trees = fewer render instances.
+const TREE_SPACING = 9;
+
 // Each player's "home" point: right at their own parcel's entrance, facing the plaza.
 // Used both as the death-respawn point (server sends the matching table for player_number,
 // see server.py PARCEL_SPAWN_POINTS) and as the local fall-through-world recovery point.
@@ -51,7 +54,16 @@ class VoxelWorld {
         this.exposedBlocks = new Map();
         this._bulkGenerating = false;
 
-        this.chunkGroup = null;
+        // Chunk-partitioned rendering (16x16 columns, full world height per chunk): a block
+        // edit only rebuilds the one small chunk it touched instead of every InstancedMesh in
+        // the whole world. This is what keeps multiplayer block edits fast as terrain grows
+        // (hills, more surface area) and as more players edit concurrently.
+        this.CHUNK_SIZE = 16;
+        this.chunkBuckets = new Map();    // chunkKey -> Map<blockKey, type> (exposed blocks in that chunk)
+        this.chunkMeshGroups = new Map(); // chunkKey -> THREE.Group currently added to the scene
+        this.dirtyChunks = new Set();
+        this.boxGeo = new THREE.BoxGeometry(1, 1, 1);
+
         this.materials = [];
         this.parcelMaterials = new Map();
 
@@ -232,8 +244,24 @@ class VoxelWorld {
         return `${x},${y},${z}`;
     }
 
+    chunkKeyFor(x, z) {
+        return `${Math.floor(x / this.CHUNK_SIZE)},${Math.floor(z / this.CHUNK_SIZE)}`;
+    }
+
     getBlock(x, y, z) {
         return this.blocks.get(this.getKey(x, y, z)) || 0;
+    }
+
+    // Highest non-air, non-water surface at (x,z), used to ground land mobs correctly now that
+    // the wild/forest/pasture zones have hill elevation (the server only tracks mob x/z, not
+    // terrain height, so the client snaps the render height to the actual local ground).
+    getSurfaceY(x, z, fallbackY) {
+        const ix = Math.round(x), iz = Math.round(z);
+        for (let y = 20; y >= 4; y--) {
+            const type = this.getBlock(ix, y, iz);
+            if (type !== 0 && type !== BLOCK.WATER) return y + 1;
+        }
+        return fallbackY;
     }
 
     isBlockExposed(x, y, z) {
@@ -248,31 +276,52 @@ class VoxelWorld {
     }
 
     // Re-evaluates exposure for a block and its 6 neighbors (the only ones whose exposure
-    // could possibly have changed) instead of the whole world.
+    // could possibly have changed) instead of the whole world. Also keeps the per-chunk
+    // buckets (used for partial re-rendering) and the dirty-chunk set in sync.
     updateExposureAround(x, y, z) {
         const coords = [[x, y, z], [x + 1, y, z], [x - 1, y, z], [x, y + 1, z], [x, y - 1, z], [x, y, z + 1], [x, y, z - 1]];
         coords.forEach(([cx, cy, cz]) => {
             const key = this.getKey(cx, cy, cz);
+            const chunkKey = this.chunkKeyFor(cx, cz);
             const type = this.blocks.get(key);
+            const bucket = this.chunkBuckets.get(chunkKey);
+
             if (type === undefined) {
                 this.exposedBlocks.delete(key);
+                if (bucket) bucket.delete(key);
+                this.dirtyChunks.add(chunkKey);
                 return;
             }
             if (this.isBlockExposed(cx, cy, cz)) {
                 this.exposedBlocks.set(key, type);
-            } else {
+                if (bucket) {
+                    bucket.set(key, type);
+                } else {
+                    this.chunkBuckets.set(chunkKey, new Map([[key, type]]));
+                }
+            } else if (bucket) {
                 this.exposedBlocks.delete(key);
+                bucket.delete(key);
             }
+            this.dirtyChunks.add(chunkKey);
         });
     }
 
     // One-time full scan, only used right after bulk world generation (see generateWorld()).
     computeAllExposure() {
         this.exposedBlocks.clear();
+        this.chunkBuckets.clear();
         this.blocks.forEach((type, key) => {
             const [x, y, z] = key.split(',').map(Number);
             if (this.isBlockExposed(x, y, z)) {
                 this.exposedBlocks.set(key, type);
+                const chunkKey = this.chunkKeyFor(x, z);
+                let bucket = this.chunkBuckets.get(chunkKey);
+                if (!bucket) {
+                    bucket = new Map();
+                    this.chunkBuckets.set(chunkKey, bucket);
+                }
+                bucket.set(key, type);
             }
         });
     }
@@ -289,7 +338,8 @@ class VoxelWorld {
         if (!this._bulkGenerating) {
             this.updateExposureAround(x, y, z);
         }
-        if (rebuild) this.rebuildAllChunks();
+        // Only the (small) chunk(s) touched by this edit get re-rendered, not the whole world.
+        if (rebuild) this.flushDirtyChunks();
     }
 
     getParcelNumber(x, z) {
@@ -398,6 +448,23 @@ class VoxelWorld {
         this.rebuildAllChunks();
     }
 
+    // Deterministic (no Math.random) rolling hill/mountain elevation for the shared natural
+    // zones (forest/wild/pasture) - every client computes byte-identical terrain from (x,z)
+    // alone, same principle as the rest of the hub. Multi-octave sine/cosine value noise gives
+    // 0-5 blocks of height, smoothly falling back to flat within 6 blocks of the zone's edge so
+    // fences/cave walls/the central cross paths always meet the terrain flush instead of
+    // floating or gapping.
+    hillHeight(x, z, bounds) {
+        const [xMin, xMax, zMin, zMax] = bounds;
+        const n = Math.sin(x * 0.13) * Math.cos(z * 0.17) * 1.6
+                + Math.sin(x * 0.045 + z * 0.08) * 2.6
+                + Math.cos(x * 0.29 - z * 0.21) * 1.0;
+        const normalized = Math.max(0, Math.min(1, (n + 2.6) / 5.2));
+        const edgeDist = Math.min(x - xMin, xMax - x, z - zMin, zMax - z);
+        const falloff = Math.max(0, Math.min(1, edgeDist / 6));
+        return Math.round(normalized * 5 * falloff);
+    }
+
     // ==================================================================
     // Central Hub (거실) Renewal: Garden / Forest / Lake / Cave&Mine /
     // Pasture / PVP Arena / Crafting Plaza. Fully deterministic (no
@@ -449,25 +516,32 @@ class VoxelWorld {
         const [xMin, xMax, zMin, zMax] = ZONES.FOREST;
         for (let x = xMin; x <= xMax; x++) {
             for (let z = zMin; z <= zMax; z++) {
-                this.setBlock(x, gy, z, BLOCK.GRASS, false);
+                const elevation = this.hillHeight(x, z, ZONES.FOREST);
+                for (let i = 0; i < elevation; i++) this.setBlock(x, gy + i, z, BLOCK.DIRT, false);
+                this.setBlock(x, gy + elevation, z, BLOCK.GRASS, false);
             }
         }
 
-        // Dense deterministic tree grid (staggered rows so it doesn't look like a checkerboard),
-        // with a clearing left open near the sapling demo patch.
+        // Deterministic tree grid (staggered rows so it doesn't look like a checkerboard, wide
+        // spacing to keep the forest airy and the instance count down), with a clearing left
+        // open near the sapling demo patch. Trees sit on top of the local hill elevation.
         let treeCount = 0;
-        for (let z = zMin + 3, row = 0; z <= zMax - 3; z += 5, row++) {
-            const rowOffset = (row % 2 === 0) ? 0 : 2;
-            for (let x = xMin + 3 + rowOffset; x <= xMax - 3; x += 5) {
+        for (let z = zMin + 3, row = 0; z <= zMax - 3; z += TREE_SPACING, row++) {
+            const rowOffset = (row % 2 === 0) ? 0 : Math.floor(TREE_SPACING / 2);
+            for (let x = xMin + 3 + rowOffset; x <= xMax - 3; x += TREE_SPACING) {
                 if (x >= -25 && x <= -13 && z >= -23 && z <= -11) continue; // clearing for sapling demo
-                this.plantFullTree(x, gy + 1, z);
+                const elevation = this.hillHeight(x, z, ZONES.FOREST);
+                this.plantFullTree(x, gy + elevation + 1, z);
                 treeCount++;
             }
         }
 
         // Cleared patch with sample saplings, ready for players to grow more trees
         const saplingSpots = [[-20, -18], [-18, -16], [-22, -16], [-19, -14], [-21, -20]];
-        saplingSpots.forEach(([x, z]) => this.setBlock(x, gy + 1, z, BLOCK.SAPLING, false));
+        saplingSpots.forEach(([x, z]) => {
+            const elevation = this.hillHeight(x, z, ZONES.FOREST);
+            this.setBlock(x, gy + elevation + 1, z, BLOCK.SAPLING, false);
+        });
     }
 
     plantFullTree(x, y, z) {
@@ -512,13 +586,21 @@ class VoxelWorld {
 
     buildCaveAndMine(gy) {
         const [wxMin, wxMax, wzMin, wzMax] = ZONES.WILD;
+        const [cxMin, cxMax, czMin, czMax] = ZONES.CAVE;
         for (let x = wxMin; x <= wxMax; x++) {
             for (let z = wzMin; z <= wzMax; z++) {
-                this.setBlock(x, gy, z, BLOCK.STONE, false);
+                // Cave interior footprint stays exactly flat - it's carved separately below.
+                const insideCave = x >= cxMin && x <= cxMax && z >= czMin && z <= czMax;
+                if (insideCave) {
+                    this.setBlock(x, gy, z, BLOCK.STONE, false);
+                    continue;
+                }
+                const elevation = this.hillHeight(x, z, ZONES.WILD);
+                for (let i = 0; i < elevation; i++) this.setBlock(x, gy + i, z, BLOCK.STONE, false);
+                this.setBlock(x, gy + elevation, z, BLOCK.STONE, false);
             }
         }
 
-        const [cxMin, cxMax, czMin, czMax] = ZONES.CAVE;
         const entranceMin = -48, entranceMax = -44;
 
         // Floor & roof
@@ -562,10 +644,13 @@ class VoxelWorld {
         const [xMin, xMax, zMin, zMax] = ZONES.PASTURE;
         for (let x = xMin; x <= xMax; x++) {
             for (let z = zMin; z <= zMax; z++) {
-                this.setBlock(x, gy, z, BLOCK.GRASS, false);
+                const elevation = this.hillHeight(x, z, ZONES.PASTURE);
+                for (let i = 0; i < elevation; i++) this.setBlock(x, gy + i, z, BLOCK.DIRT, false);
+                this.setBlock(x, gy + elevation, z, BLOCK.GRASS, false);
             }
         }
-        // Fence ring with a gate gap facing the garden center
+        // Fence ring with a gate gap facing the garden center (elevation is always 0 right at
+        // these boundary edges thanks to the falloff, so posts stay flush with flat terrain)
         for (let x = xMin; x <= xMax; x++) {
             this.setBlock(x, gy + 1, zMin, BLOCK.FENCE, false);
             this.setBlock(x, gy + 1, zMax, BLOCK.FENCE, false);
@@ -664,21 +749,26 @@ class VoxelWorld {
         this.scene.add(this.signGroup);
     }
 
-    // High Performance THREE.InstancedMesh Rendering (Reduces Draw Calls from 25,600 to ~35!)
-    rebuildAllChunks() {
-        if (this.chunkGroup) {
-            this.scene.remove(this.chunkGroup);
+    // High Performance THREE.InstancedMesh Rendering, partitioned per chunk (Reduces Draw Calls
+    // from 25,600 to ~35 per chunk!) so a single block edit only touches one small chunk group
+    // instead of rebuilding every InstancedMesh in the entire world.
+    rebuildChunkGroup(chunkKey) {
+        const existing = this.chunkMeshGroups.get(chunkKey);
+        if (existing) {
+            this.scene.remove(existing);
+            this.chunkMeshGroups.delete(chunkKey);
         }
 
-        this.chunkGroup = new THREE.Group();
-        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-        const dummy = new THREE.Object3D();
+        const bucket = this.chunkBuckets.get(chunkKey);
+        if (!bucket || bucket.size === 0) return;
 
+        const group = new THREE.Group();
+        const dummy = new THREE.Object3D();
         const materialGroups = new Map();
 
-        // exposedBlocks is already filtered to just the surface-visible blocks (maintained
+        // bucket is already filtered to just this chunk's surface-visible blocks (maintained
         // incrementally by setBlock/updateExposureAround), so no per-block neighbor checks here.
-        this.exposedBlocks.forEach((type, key) => {
+        bucket.forEach((type, key) => {
             const [x, y, z] = key.split(',').map(Number);
 
             if (!materialGroups.has(type)) {
@@ -700,12 +790,12 @@ class VoxelWorld {
             // Use InstancedMesh for Single-Material Blocks, or Mesh for Array Material (Grass/Logs)
             if (Array.isArray(mat)) {
                 positions.forEach(p => {
-                    const mesh = new THREE.Mesh(boxGeo, mat);
+                    const mesh = new THREE.Mesh(this.boxGeo, mat);
                     mesh.position.set(p.x + 0.5, p.y + 0.5, p.z + 0.5);
-                    this.chunkGroup.add(mesh);
+                    group.add(mesh);
                 });
             } else {
-                const instancedMesh = new THREE.InstancedMesh(boxGeo, mat, positions.length);
+                const instancedMesh = new THREE.InstancedMesh(this.boxGeo, mat, positions.length);
                 for (let i = 0; i < positions.length; i++) {
                     const p = positions[i];
                     dummy.position.set(p.x + 0.5, p.y + 0.5, p.z + 0.5);
@@ -713,11 +803,27 @@ class VoxelWorld {
                     instancedMesh.setMatrixAt(i, dummy.matrix);
                 }
                 instancedMesh.instanceMatrix.needsUpdate = true;
-                this.chunkGroup.add(instancedMesh);
+                group.add(instancedMesh);
             }
         });
 
-        this.scene.add(this.chunkGroup);
+        this.scene.add(group);
+        this.chunkMeshGroups.set(chunkKey, group);
+    }
+
+    // Rebuilds only the chunks touched since the last flush (normal per-edit / per-batch path).
+    flushDirtyChunks() {
+        if (this.dirtyChunks.size === 0) return;
+        this.dirtyChunks.forEach((chunkKey) => this.rebuildChunkGroup(chunkKey));
+        this.dirtyChunks.clear();
+    }
+
+    // Full-world rebuild - only needed once, right after generateWorld()'s bulk load. Everyday
+    // edits (player block changes, sapling growth batches, ore respawns, world-edit reloads) all
+    // go through flushDirtyChunks() instead, which only touches the chunks that actually changed.
+    rebuildAllChunks() {
+        this.chunkBuckets.forEach((_, chunkKey) => this.dirtyChunks.add(chunkKey));
+        this.flushDirtyChunks();
     }
 }
 
@@ -757,6 +863,7 @@ class MinecraftGame {
 
         this.initLighting();
         this.initNumberGridSelector();
+        this.initGameModeSelector();
         this.initEventListeners();
         this.initActiveTouchJoystick();
         this.initCharacterCustomization();
@@ -812,12 +919,14 @@ class MinecraftGame {
                 statusEl.textContent = '';
                 statusEl.className = 'room-id-status';
                 this.applyNumberRegistrationColors(null);
+                this.applyGameModeLock(null);
                 return;
             }
             if (val.length < 4) {
                 statusEl.textContent = '⚠️ 방 아이디는 4글자 이상 입력해주세요';
                 statusEl.className = 'room-id-status warn';
                 this.applyNumberRegistrationColors(null);
+                this.applyGameModeLock(null);
                 return;
             }
 
@@ -836,9 +945,11 @@ class MinecraftGame {
                         statusEl.className = 'room-id-status ok';
                     }
                     this.applyNumberRegistrationColors(result ? result.registered_numbers || [] : []);
+                    this.applyGameModeLock(result ? result.game_mode : null);
                 } catch (e) {
                     statusEl.textContent = '✨ 새 방 생성 또는 기존 방 접속 (입력 후 게임 시작)';
                     statusEl.className = 'room-id-status ok';
+                    this.applyGameModeLock(null);
                 }
             }, 300);
         };
@@ -989,6 +1100,65 @@ class MinecraftGame {
         } else {
             statusEl.textContent = `🆕 ${num}번은 새 번호예요. 비밀번호를 새로 만들고 꼭 기억하세요!`;
             statusEl.className = 'room-id-status ok';
+        }
+    }
+
+    // Game Mode Selector (Login screen): only meaningful while creating a brand-new room -
+    // once a room exists its mode is fixed forever (see applyGameModeLock()).
+    initGameModeSelector() {
+        const hiddenInput = document.getElementById('selected-mode');
+        if (!hiddenInput) return;
+        document.querySelectorAll('.mode-btn').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (btn.disabled) return;
+                document.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                hiddenInput.value = btn.dataset.mode;
+            });
+        });
+    }
+
+    // Called from initRoomIdCheck() once we know whether the typed room id already exists.
+    // existingMode is 'survival'/'creative' for an existing room, or null for a brand-new one.
+    applyGameModeLock(existingMode) {
+        const row = document.getElementById('mode-selector-row');
+        const statusEl = document.getElementById('mode-status');
+        const hiddenInput = document.getElementById('selected-mode');
+        if (!row || !hiddenInput) return;
+
+        if (existingMode) {
+            hiddenInput.value = existingMode;
+            row.classList.add('locked');
+            document.querySelectorAll('.mode-btn').forEach((b) => {
+                b.classList.toggle('selected', b.dataset.mode === existingMode);
+                b.disabled = true;
+            });
+            if (statusEl) {
+                statusEl.textContent = `🔒 이 방은 이미 [${existingMode === 'creative' ? '크리에이티브' : '서바이벌'}] 모드로 생성되었습니다.`;
+                statusEl.className = 'room-id-status info';
+            }
+        } else {
+            row.classList.remove('locked');
+            document.querySelectorAll('.mode-btn').forEach((b) => { b.disabled = false; });
+            if (statusEl) {
+                statusEl.textContent = '';
+                statusEl.className = 'room-id-status';
+            }
+        }
+    }
+
+    // Called once from network.js right after login_res arrives, with the room's fixed mode.
+    applyGameMode(mode) {
+        this.gameMode = mode === 'creative' ? 'creative' : 'survival';
+        const isCreative = this.gameMode === 'creative';
+        if (this.inventory) this.inventory.creative = isCreative;
+        if (this.physics) this.physics.creative = isCreative;
+
+        const modeBadge = document.getElementById('mode-badge');
+        if (modeBadge) {
+            modeBadge.textContent = isCreative ? '🛠️ 크리에이티브' : '⚔️ 서바이벌';
+            modeBadge.classList.toggle('creative', isCreative);
         }
     }
 
@@ -1152,6 +1322,17 @@ class MinecraftGame {
             const jumpPress = (e) => {
                 e.preventDefault();
                 this.physics.keys.jump = true;
+                // Creative-only flight toggle: double-tap within 300ms (touch equivalent of the
+                // double-space-tap desktop shortcut).
+                if (this.physics.creative) {
+                    const now = performance.now();
+                    if (this._lastSpaceTime && now - this._lastSpaceTime < 300) {
+                        this.physics.flying = !this.physics.flying;
+                        this.physics.velocity.y = 0;
+                        this.showToast(this.physics.flying ? '🕊️ 비행 모드 ON' : '🕊️ 비행 모드 OFF');
+                    }
+                    this._lastSpaceTime = now;
+                }
             };
             const jumpRelease = (e) => {
                 e.preventDefault();
@@ -1311,7 +1492,21 @@ class MinecraftGame {
             if (e.code === 'KeyS') this.physics.keys.backward = true;
             if (e.code === 'KeyA') this.physics.keys.left = true;
             if (e.code === 'KeyD') this.physics.keys.right = true;
-            if (e.code === 'Space') this.physics.keys.jump = true;
+            if (e.code === 'Space') {
+                this.physics.keys.jump = true;
+                // Creative-only flight toggle: double-tap Space within 300ms (mirrors Minecraft).
+                // e.repeat guards against the browser's key-auto-repeat firing this every ~30-100ms
+                // while Space is just held down, which would otherwise flicker flying on/off.
+                if (this.physics.creative && !e.repeat) {
+                    const now = performance.now();
+                    if (this._lastSpaceTime && now - this._lastSpaceTime < 300) {
+                        this.physics.flying = !this.physics.flying;
+                        this.physics.velocity.y = 0;
+                        this.showToast(this.physics.flying ? '🕊️ 비행 모드 ON' : '🕊️ 비행 모드 OFF');
+                    }
+                    this._lastSpaceTime = now;
+                }
+            }
             if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.physics.keys.sneak = true;
             if (e.code === 'ControlLeft' || e.code === 'ControlRight') this.physics.keys.sprint = true;
 
@@ -1429,6 +1624,7 @@ class MinecraftGame {
             const password = document.getElementById('password').value.trim();
             const parcelPin = document.getElementById('parcel-pin').value.trim();
             const playerNum = parseInt(document.getElementById('selected-number').value || '1', 10);
+            const gameMode = document.getElementById('selected-mode').value || 'survival';
 
             const errDiv = document.getElementById('login-error');
             if (username.length < 4) {
@@ -1453,7 +1649,7 @@ class MinecraftGame {
                 return;
             }
 
-            this.net.connect(username, password, parcelPin, playerNum);
+            this.net.connect(username, password, parcelPin, playerNum, gameMode);
         };
 
         const loginFormEl = document.getElementById('login-form');

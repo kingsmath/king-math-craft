@@ -21,6 +21,11 @@ class PlayerPhysics {
         // Assigned Player Parcel Number (1-32)
         this.playerNumber = 1;
 
+        // Creative-mode flight (set by MinecraftGame.applyGameMode / toggled via double-tap jump)
+        this.creative = false;
+        this.flying = false;
+        this.flySpeed = 9.0;
+
         // Key states (Keyboard & Touch)
         this.keys = {
             forward: false,
@@ -195,8 +200,14 @@ class PlayerPhysics {
         this.velocity.x += (targetVx - this.velocity.x) * Math.min(1.0, delta * lerpRate);
         this.velocity.z += (targetVz - this.velocity.z) * Math.min(1.0, delta * lerpRate);
 
-        // Traditional Jump (or Swim-Up while in water)
-        if (this.keys.jump && this.onGround && !this.inWater) {
+        // Free flight (creative mode only, toggled via double-tap jump) - no gravity, Space/Shift
+        // move straight up/down at a constant speed.
+        if (this.flying) {
+            if (this.keys.jump) this.velocity.y = this.flySpeed;
+            else if (this.keys.sneak) this.velocity.y = -this.flySpeed;
+            else this.velocity.y *= 0.8;
+        } else if (this.keys.jump && this.onGround && !this.inWater) {
+            // Traditional Jump (or Swim-Up while in water)
             this.velocity.y = this.jumpForce;
             this.onGround = false;
             if (typeof sfx !== 'undefined') sfx.playJump();
@@ -204,8 +215,10 @@ class PlayerPhysics {
             this.velocity.y = Math.min(this.velocity.y + this.gravity * delta * 2.2, 3.2);
         }
 
-        // Gravity (buoyant/slowed while swimming)
-        if (this.inWater) {
+        // Gravity (buoyant/slowed while swimming, none while flying)
+        if (this.flying) {
+            // no gravity while flying
+        } else if (this.inWater) {
             this.velocity.y -= this.gravity * 0.18 * delta;
             this.velocity.y = Math.max(this.velocity.y, -2.2);
         } else {
